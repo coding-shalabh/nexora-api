@@ -1,0 +1,3884 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SuperAdmin {
+  id                  String                @id @default(cuid())
+  email               String                @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  avatarUrl           String?
+  role                SuperAdminRole        @default(ADMIN)
+  permissions         Json?
+  isActive            Boolean               @default(true)
+  mfaEnabled          Boolean               @default(false)
+  mfaSecret           String?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  platform_audit_logs platform_audit_logs[]
+  sessions            SuperAdminSession[]
+
+  @@map("super_admins")
+}
+
+model SuperAdminSession {
+  id           String     @id @default(cuid())
+  superAdminId String
+  token        String     @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime   @default(now())
+  superAdmin   SuperAdmin @relation(fields: [superAdminId], references: [id], onDelete: Cascade)
+
+  @@index([superAdminId])
+  @@index([token])
+  @@map("super_admin_sessions")
+}
+
+model Tenant {
+  id                      String               @id @default(cuid())
+  name                    String
+  slug                    String               @unique
+  domain                  String?              @unique
+  logoUrl                 String?
+  address                 String?
+  phone                   String?
+  email                   String?
+  website                 String?
+  timezone                String               @default("UTC")
+  currency                String               @default("USD")
+  locale                  String               @default("en")
+  industry                String?
+  size                    String?
+  settings                Json?
+  status                  TenantStatus         @default(ACTIVE)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  gstin                   String?
+  pan                     String?
+  legalName               String?
+  tradeName               String?
+  stateCode               String?
+  stateName               String?
+  registeredAddress       String?
+  cin                     String?
+  gstRegistrationType     String?
+  channelSetupCompletedAt DateTime?
+  emailAccountId          String?
+  emailConfigStatus       ChannelConfigStatus  @default(NOT_STARTED)
+  emailReadyAt            DateTime?
+  hasAnyChannelReady      Boolean              @default(false)
+  hasEmail                Boolean              @default(false)
+  hasSMS                  Boolean              @default(false)
+  hasVoice                Boolean              @default(false)
+  hasWhatsApp             Boolean              @default(false)
+  smsAccountId            String?
+  smsConfigStatus         ChannelConfigStatus  @default(NOT_STARTED)
+  smsReadyAt              DateTime?
+  voiceAccountId          String?
+  voiceConfigStatus       ChannelConfigStatus  @default(NOT_STARTED)
+  voiceReadyAt            DateTime?
+  whatsAppAccountId       String?
+  whatsAppConfigStatus    ChannelConfigStatus  @default(NOT_STARTED)
+  whatsAppReadyAt         DateTime?
+  whatsAppSetupMode       WhatsAppSetupMode?
+  call_sessions           CallSession[]
+  onboarding_progress     onboarding_progress?
+  subscriptions           Subscription[]
+  users                   User[]
+  wallets                 wallets?
+  workspaces              Workspace[]
+
+  @@map("tenants")
+}
+
+model OnboardingSession {
+  id            String           @id @default(cuid())
+  orderId       String           @unique
+  planId        String
+  billingCycle  String
+  tenantId      String           @unique
+  email         String
+  firstName     String?
+  lastName      String?
+  status        OnboardingStatus @default(IN_PROGRESS)
+  currentStep   String           @default("company")
+  companyData   Json?
+  adminData     Json?
+  teamData      Json?
+  emailData     Json?
+  crmData       Json?
+  ticketingData Json?
+  marketingData Json?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  completedAt   DateTime?
+  expiresAt     DateTime
+
+  @@index([email])
+  @@index([status])
+  @@map("onboarding_sessions")
+}
+
+model Workspace {
+  id           String          @id @default(cuid())
+  tenantId     String
+  name         String
+  description  String?
+  timezone     String?
+  currency     String?
+  workingHours Json?
+  holidays     Json?
+  isDefault    Boolean         @default(false)
+  status       WorkspaceStatus @default(ACTIVE)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  users        UserWorkspace[]
+  tenant       Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("workspaces")
+}
+
+model User {
+  id                                   String                      @id @default(cuid())
+  tenantId                             String
+  email                                String
+  phone                                String?
+  firstName                            String
+  lastName                             String
+  displayName                          String?
+  avatarUrl                            String?
+  passwordHash                         String?
+  emailVerified                        Boolean                     @default(false)
+  phoneVerified                        Boolean                     @default(false)
+  mfaEnabled                           Boolean                     @default(false)
+  mfaSecret                            String?
+  settings                             Json?
+  status                               UserStatus                  @default(ACTIVE)
+  lastLoginAt                          DateTime?
+  createdAt                            DateTime                    @default(now())
+  updatedAt                            DateTime                    @updatedAt
+  verificationResendCount              Int                         @default(0)
+  isOnline                             Boolean                     @default(false)
+  lastSeenAt                           DateTime?
+  assignedActivities                   Activity[]                  @relation("ActivityAssignedTo")
+  createdActivities                    Activity[]                  @relation("ActivityCreatedBy")
+  api_keys                             api_keys[]
+  call_sessions                        CallSession[]
+  contacts_contacts_createdByIdTousers Contact[]                   @relation("contacts_createdByIdTousers")
+  contacts_contacts_ownerIdTousers     Contact[]                   @relation("contacts_ownerIdTousers")
+  assignedConversations                Conversation[]              @relation("AssignedConversations")
+  deals                                Deal[]
+  email_verification_tokens            email_verification_tokens[]
+  integrations                         integrations[]
+  leads                                Lead[]
+  password_reset_tokens                password_reset_tokens[]
+  sessions                             Session[]
+  signatures                           Signature[]
+  taskComments                         TaskComment[]
+  assignedTasks                        Task[]                      @relation("TaskAssignee")
+  createdTasks                         Task[]                      @relation("TaskCreator")
+  tickets                              Ticket[]
+  timeEntries                          TimeEntry[]
+  roles                                UserRole[]
+  workspaces                           UserWorkspace[]
+  tenant                               Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  webhooks                             webhooks[]
+  calendarEvents                       CalendarEvent[]             @relation("CalendarEventOrganizer")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  tenantId    String
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
+  data        Json?            // Additional data (e.g., link, entityId, entityType)
+  read        Boolean          @default(false)
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+  expiresAt   DateTime?
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([tenantId, userId, read])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  MESSAGE           // New message received
+  CONVERSATION      // Conversation assigned/updated
+  MENTION           // @mentioned in conversation
+  TASK              // Task assigned/updated
+  DEAL              // Deal updated/won/lost
+  LEAD              // New lead or lead updated
+  CAMPAIGN          // Campaign started/completed/failed
+  SYSTEM            // System maintenance/alerts
+  SECURITY          // Security alerts
+  BILLING           // Billing/subscription alerts
+  TEAM              // Team member added/removed
+}
+
+model UserWorkspace {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+  @@map("user_workspaces")
+}
+
+model UserInvite {
+  id          String       @id @default(cuid())
+  tenantId    String
+  workspaceId String?
+  email       String
+  firstName   String?
+  lastName    String?
+  role        String
+  invitedBy   String?
+  token       String?      @unique @default(cuid())
+  status      InviteStatus @default(PENDING)
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime
+
+  @@unique([tenantId, email])
+  @@index([status])
+  @@index([token])
+  @@map("user_invites")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  level       Int              @default(1)
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, level])
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  name        String
+  description String?
+  module      String
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  userId         String
+  token          String   @unique
+  refreshToken   String?  @unique
+  userAgent      String?
+  ipAddress      String?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  lastActivityAt DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("sessions")
+}
+
+model Contact {
+  id                                String               @id @default(cuid())
+  tenantId                          String
+  firstName                         String?
+  lastName                          String?
+  displayName                       String?
+  email                             String?
+  phone                             String?
+  additionalEmails                  Json?
+  additionalPhones                  Json?
+  companyId                         String?
+  jobTitle                          String?
+  linkedinUrl                       String?
+  twitterUrl                        String?
+  marketingConsent                  Boolean              @default(false)
+  whatsappConsent                   Boolean              @default(false)
+  consentUpdatedAt                  DateTime?
+  sourceDetails                     Json?
+  ownerId                           String?
+  status                            ContactStatus        @default(ACTIVE)
+  customFields                      Json?
+  createdAt                         DateTime             @default(now())
+  updatedAt                         DateTime             @updatedAt
+  lastActivityAt                    DateTime?
+  lifecycleStage                    LifecycleStage?
+  leadStatus                        LeadStatusType?
+  leadScore                         Int?
+  leadScoreUpdatedAt                DateTime?
+  becameLeadAt                      DateTime?
+  becameMqlAt                       DateTime?
+  becameSqlAt                       DateTime?
+  becameOpportunityAt               DateTime?
+  becameCustomerAt                  DateTime?
+  contactUnworked                   Boolean              @default(true)
+  personaType                       String?
+  buyingRole                        String?
+  isQualified                       Boolean              @default(false)
+  qualifiedDate                     DateTime?
+  disqualificationReason            String?
+  rating                            LeadRating?
+  priority                          LeadPriority?
+  likelihoodToClose                 Int?
+  expectedRevenue                   Decimal?             @db.Decimal(15, 2)
+  firstOutreachDate                 DateTime?
+  lastContactedDate                 DateTime?
+  lastEngagementDate                DateTime?
+  lastEngagementType                String?
+  leadResponseTime                  Int?
+  emailCount                        Int                  @default(0)
+  callCount                         Int                  @default(0)
+  meetingCount                      Int                  @default(0)
+  outreachCount                     Int                  @default(0)
+  nextActivityDate                  DateTime?
+  nextActivityType                  String?
+  followUpDate                      DateTime?
+  referredBy                        String?
+  campaign                          String?
+  medium                            String?
+  adCampaign                        String?
+  territory                         String?
+  segment                           String?
+  inSequence                        Boolean              @default(false)
+  sequenceName                      String?
+  workflowStatus                    String?
+  isTargetAccount                   Boolean              @default(false)
+  salutation                        String?
+  middleName                        String?
+  suffix                            String?
+  preferredName                     String?
+  dateOfBirth                       DateTime?
+  gender                            String?
+  department                        String?
+  reportsToId                       String?
+  assistantName                     String?
+  assistantPhone                    String?
+  assistantEmail                    String?
+  mobilePhone                       String?
+  homePhone                         String?
+  fax                               String?
+  otherPhone                        String?
+  originalSource                    String?
+  firstConversionDate               DateTime?
+  lastConversionDate                DateTime?
+  numberOfConversions               Int                  @default(0)
+  pageViewCount                     Int                  @default(0)
+  lastPageSeen                      String?
+  firstPageSeen                     String?
+  numberOfTimesContacted            Int                  @default(0)
+  daysToClose                       Int?
+  doNotCall                         Boolean              @default(false)
+  emailOptOut                       Boolean              @default(false)
+  preferredLanguage                 String?
+  preferredContactMethod            String?
+  facebookUrl                       String?
+  instagramUrl                      String?
+  websiteUrl                        String?
+  gstin                             String?
+  billingAddress                    String?
+  billingCity                       String?
+  billingState                      String?
+  billingStateCode                  String?
+  billingPincode                    String?
+  shippingAddress                   String?
+  shippingCity                      String?
+  shippingState                     String?
+  shippingStateCode                 String?
+  shippingPincode                   String?
+  createdById                       String?
+  source                            ContactSource?
+  broadcastCount                    Int                  @default(0)
+  emailConsent                      Boolean              @default(false)
+  lastBroadcastAt                   DateTime?
+  lastMarketingEmailAt              DateTime?
+  marketingEmailClickCount          Int                  @default(0)
+  marketingEmailCount               Int                  @default(0)
+  marketingEmailOpenCount           Int                  @default(0)
+  marketingScore                    Int?
+  sequenceCount                     Int                  @default(0)
+  smsConsent                        Boolean              @default(false)
+  subscriptionPreferences           Json?
+  unsubscribeReason                 String?
+  unsubscribedAt                    DateTime?
+  voiceConsent                      Boolean              @default(false)
+  activities                        Activity[]
+  callSessions                      CallSession[]
+  tags                              ContactTag[]
+  company                           Company?             @relation(fields: [companyId], references: [id])
+  users_contacts_createdByIdTousers User?                @relation("contacts_createdByIdTousers", fields: [createdById], references: [id])
+  users_contacts_ownerIdTousers     User?                @relation("contacts_ownerIdTousers", fields: [ownerId], references: [id])
+  contacts                          Contact?             @relation("contactsTocontacts", fields: [reportsToId], references: [id])
+  other_contacts                    Contact[]            @relation("contactsTocontacts")
+  conversation_threads              ConversationThread[]
+  conversations                     Conversation[]
+  deals                             Deal[]
+  formSubmissions                   FormSubmission[]     @relation("ContactFormSubmissions")
+  invoices                          Invoice[]
+  lead                              Lead?
+  linkClicks                        LinkClick[]          @relation("ContactLinkClicks")
+  pageViews                         PageView[]           @relation("ContactPageViews")
+  quotes                            Quote[]
+  tickets                           Ticket[]
+  events                            VisitorEvent[]       @relation("ContactEvents")
+  sessions                          VisitorSession[]     @relation("ContactSessions")
+
+  @@index([tenantId])
+  @@index([tenantId, email])
+  @@index([tenantId, phone])
+  @@index([tenantId, companyId])
+  @@index([tenantId, leadStatus])
+  @@index([tenantId, lifecycleStage])
+  @@index([tenantId, ownerId])
+  @@map("contacts")
+}
+
+model Company {
+  id                  String            @id @default(cuid())
+  tenantId            String
+  name                String
+  domain              String?
+  description         String?
+  industry            String?
+  employeeCount       String?
+  annualRevenue       String?
+  address             String?
+  city                String?
+  state               String?
+  country             String?
+  postalCode          String?
+  parentCompanyId     String?
+  ownerId             String?
+  customFields        Json?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  companyType         CompanyType?
+  lifecycleStage      CompanyLifecycle?
+  phone               String?
+  email               String?
+  fax                 String?
+  totalRevenue        Decimal?          @db.Decimal(15, 2)
+  dealsWonCount       Int               @default(0)
+  totalDealValue      Decimal?          @db.Decimal(15, 2)
+  linkedinUrl         String?
+  facebookUrl         String?
+  twitterUrl          String?
+  websiteUrl          String?
+  foundedYear         Int?
+  timezone            String?
+  preferredLanguage   String?
+  gstin               String?
+  pan                 String?
+  legalName           String?
+  stateCode           String?
+  gstRegistrationType String?
+  isGstRegistered     Boolean           @default(false)
+  activities          Activity[]
+  companies           Company?          @relation("companiesTocompanies", fields: [parentCompanyId], references: [id])
+  other_companies     Company[]         @relation("companiesTocompanies")
+  contacts            Contact[]
+  deals               Deal[]
+  sessions            VisitorSession[]  @relation("CompanySessions")
+
+  @@index([tenantId])
+  @@index([tenantId, domain])
+  @@index([tenantId, companyType])
+  @@index([tenantId, lifecycleStage])
+  @@map("companies")
+}
+
+model Tag {
+  id                String              @id @default(cuid())
+  tenantId          String
+  name              String
+  color             String              @default("#6366f1")
+  description       String?
+  createdAt         DateTime            @default(now())
+  contacts          ContactTag[]
+  conversation_tags conversation_tags[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("tags")
+}
+
+model ContactTag {
+  id        String   @id @default(cuid())
+  contactId String
+  tagId     String
+  createdAt DateTime @default(now())
+  contact   Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([contactId, tagId])
+  @@map("contact_tags")
+}
+
+model Activity {
+  id                   String               @id @default(cuid())
+  tenantId             String
+  type                 ActivityType
+  subject              String?
+  description          String?
+  contactId            String?
+  companyId            String?
+  dealId               String?
+  ticketId             String?
+  dueDate              DateTime?
+  completedAt          DateTime?
+  priority             Priority?
+  callOutcome          String?
+  callDuration         Int?
+  meetingLocation      String?
+  meetingUrl           String?
+  attendees            Json?
+  metadata             Json?
+  assignedToId         String?
+  createdById          String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  broadcastId          String?
+  campaignId           String?
+  channel              String?
+  messageId            String?
+  segmentId            String?
+  sequenceEnrollmentId String?
+  sequenceId           String?
+  sequenceStepId       String?
+  assignedTo           User?                @relation("ActivityAssignedTo", fields: [assignedToId], references: [id])
+  broadcasts           broadcasts?          @relation(fields: [broadcastId], references: [id])
+  marketing_campaigns  marketing_campaigns? @relation(fields: [campaignId], references: [id])
+  company              Company?             @relation(fields: [companyId], references: [id])
+  contact              Contact?             @relation(fields: [contactId], references: [id])
+  createdBy            User?                @relation("ActivityCreatedBy", fields: [createdById], references: [id])
+  deal                 Deal?                @relation(fields: [dealId], references: [id])
+  sequences            sequences?           @relation(fields: [sequenceId], references: [id])
+  tickets              Ticket?              @relation(fields: [ticketId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, assignedToId])
+  @@index([tenantId, broadcastId])
+  @@index([tenantId, campaignId])
+  @@index([tenantId, companyId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, dealId])
+  @@index([tenantId, dueDate])
+  @@index([tenantId, sequenceId])
+  @@index([tenantId, type])
+  @@map("activities")
+}
+
+model Pipeline {
+  id          String       @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  type        PipelineType @default(DEAL)
+  isDefault   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deals       Deal[]
+  stages      Stage[]
+  tickets     Ticket[]
+
+  @@unique([tenantId, name, type])
+  @@index([tenantId])
+  @@map("pipelines")
+}
+
+model Stage {
+  id             String   @id @default(cuid())
+  tenantId       String
+  pipelineId     String
+  name           String
+  description    String?
+  color          String   @default("#6366f1")
+  order          Int
+  probability    Int?
+  isWon          Boolean  @default(false)
+  isLost         Boolean  @default(false)
+  isClosed       Boolean  @default(false)
+  requiredFields Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deals          Deal[]
+  pipeline       Pipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  tickets        Ticket[]
+
+  @@unique([pipelineId, name])
+  @@index([pipelineId])
+  @@index([tenantId])
+  @@map("stages")
+}
+
+model Deal {
+  id                String          @id @default(cuid())
+  tenantId          String
+  name              String
+  description       String?
+  pipelineId        String
+  stageId           String
+  amount            Decimal?        @db.Decimal(15, 2)
+  currency          String          @default("USD")
+  expectedCloseDate DateTime?
+  closedAt          DateTime?
+  wonReason         String?
+  lostReason        String?
+  competitor        String?
+  contactId         String?
+  companyId         String?
+  ownerId           String?
+  leadId            String?
+  customFields      Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  stageChangedAt    DateTime?
+  activities        Activity[]
+  products          DealProduct[]
+  company           Company?        @relation(fields: [companyId], references: [id])
+  contact           Contact?        @relation(fields: [contactId], references: [id])
+  owner             User?           @relation(fields: [ownerId], references: [id])
+  pipeline          Pipeline        @relation(fields: [pipelineId], references: [id])
+  stage             Stage           @relation(fields: [stageId], references: [id])
+  lead              Lead?
+  quotes            Quote[]
+
+  @@index([tenantId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, pipelineId])
+  @@index([tenantId, stageId])
+  @@map("deals")
+}
+
+model Ticket {
+  id               String        @id @default(cuid())
+  tenantId         String
+  subject          String
+  description      String?
+  pipelineId       String
+  stageId          String
+  priority         Priority      @default(MEDIUM)
+  category         String?
+  subcategory      String?
+  slaPolicyId      String?
+  firstResponseDue DateTime?
+  resolutionDue    DateTime?
+  firstResponseAt  DateTime?
+  resolvedAt       DateTime?
+  slaPaused        Boolean       @default(false)
+  slaPausedAt      DateTime?
+  contactId        String?
+  conversationId   String?
+  assignedToId     String?
+  closeReason      String?
+  reopenReason     String?
+  reopenCount      Int           @default(0)
+  customFields     Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  closedAt         DateTime?
+  activities       Activity[]
+  users            User?         @relation(fields: [assignedToId], references: [id])
+  contact          Contact?      @relation(fields: [contactId], references: [id])
+  conversations    Conversation? @relation(fields: [conversationId], references: [id])
+  pipelines        Pipeline      @relation(fields: [pipelineId], references: [id])
+  slaPolicy        SLAPolicy?    @relation(fields: [slaPolicyId], references: [id])
+  stages           Stage         @relation(fields: [stageId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, assignedToId])
+  @@index([tenantId, pipelineId])
+  @@index([tenantId, priority])
+  @@index([tenantId, stageId])
+  @@map("tickets")
+}
+
+model Channel {
+  id             String         @id @default(cuid())
+  tenantId       String
+  type           ChannelType
+  name           String
+  wabaId         String?
+  phoneNumber    String?
+  phoneNumberId  String?
+  provider       String
+  providerConfig Json?
+  status         ChannelStatus  @default(PENDING)
+  verifiedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  conversations  Conversation[]
+  templates      Template[]
+
+  @@index([tenantId])
+  @@map("channels")
+}
+
+model ChannelAccount {
+  id                     String               @id @default(cuid())
+  tenantId               String
+  type                   ChannelAccountType
+  name                   String
+  provider               String
+  providerConfig         Json?
+  wabaId                 String?
+  phoneNumber            String?
+  phoneNumberId          String?
+  senderId               String?
+  dltEntityId            String?
+  dltTemplateIds         Json?
+  callerId               String?
+  callMaskingEnabled     Boolean              @default(false)
+  recordingEnabled       Boolean              @default(true)
+  consentProofUrl        String?
+  emailAddress           String?
+  oauthProvider          String?
+  oauthTokens            Json?
+  syncState              Json?
+  lastSyncAt             DateTime?
+  watchExpiresAt         DateTime?
+  status                 ChannelAccountStatus @default(PENDING)
+  healthStatus           ChannelHealthStatus  @default(UNKNOWN)
+  lastHealthCheck        DateTime?
+  healthDetails          Json?
+  rateLimitInfo          Json?
+  isDefault              Boolean              @default(false)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+  verifiedAt             DateTime?
+  approvedTemplateCount  Int                  @default(0)
+  businessCategory       String?
+  businessDisplayName    String?
+  businessVerified       Boolean              @default(false)
+  businessVerifiedAt     DateTime?
+  byokApiEndpoint        String?
+  byokApiKey             String?
+  byokProvider           String?
+  byokWebhookSecret      String?
+  configErrors           Json?
+  hasApprovedTemplates   Boolean              @default(false)
+  isConfigComplete       Boolean              @default(false)
+  msg91AuthKey           String?
+  msg91CompanyId         String?
+  msg91OAuthComplete     Boolean              @default(false)
+  msg91OnboardingStatus  String?
+  msg91SenderId          String?
+  msg91WebhookConfigured Boolean              @default(false)
+  whatsappSetupMode      WhatsAppSetupMode?
+  call_sessions          CallSession[]
+  email_signatures       email_signatures[]
+  message_events         message_events[]
+  sms_templates          sms_templates[]
+
+  @@unique([tenantId, type, emailAddress])
+  @@unique([tenantId, type, phoneNumber])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@map("channel_accounts")
+}
+
+model CalendarEvent {
+  id          String              @id @default(cuid())
+  tenantId    String
+  organizerId String
+  title       String
+  description String?
+  type        CalendarEventType   @default(MEETING)
+  startTime   DateTime
+  endTime     DateTime
+  allDay      Boolean             @default(false)
+  timezone    String              @default("UTC")
+  location    String?
+  meetingUrl  String?
+  isRecurring Boolean             @default(false)
+  recurrence  Json?
+  status      CalendarEventStatus @default(SCHEDULED)
+  attendees   String[]
+  reminders   Json?
+  color       String?
+  metadata    Json?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  organizer   User                @relation("CalendarEventOrganizer", fields: [organizerId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, organizerId])
+  @@index([tenantId, startTime])
+  @@index([tenantId, type])
+  @@index([tenantId, status])
+  @@map("calendar_events")
+}
+
+model Conversation {
+  id                    String              @id @default(cuid())
+  tenantId              String
+  channelId             String
+  channelType           ChannelType
+  externalId            String?
+  contactId             String?
+  contactPhone          String?
+  contactName           String?
+  status                ConversationStatus  @default(OPEN)
+  assignedToId          String?
+  lastCustomerMessageAt DateTime?
+  windowExpiresAt       DateTime?
+  firstResponseAt       DateTime?
+  firstResponseDue      DateTime?
+  lastMessagePreview    String?
+  unreadCount           Int                 @default(0)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  closedAt              DateTime?
+  conversation_tags     conversation_tags[]
+  assignedTo            User?               @relation("AssignedConversations", fields: [assignedToId], references: [id])
+  channel               Channel             @relation(fields: [channelId], references: [id])
+  contact               Contact?            @relation(fields: [contactId], references: [id])
+  tickets               Ticket[]
+
+  @@index([tenantId])
+  @@index([contactPhone])
+  @@index([tenantId, assignedToId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, status])
+  @@map("conversations")
+}
+
+model ConversationThread {
+  id                    String                   @id @default(cuid())
+  tenantId              String
+  contactId             String?
+  contactPhone          String?
+  contactEmail          String?
+  contactWhatsAppId     String?
+  status                ConversationThreadStatus @default(OPEN)
+  priority              Priority                 @default(MEDIUM)
+
+  // Purpose classification for inbox segmentation
+  purpose               ConversationPurpose      @default(GENERAL)
+  purposeSetAt          DateTime?
+  purposeSetById        String?                  // User ID or "SYSTEM" for auto-classification
+  subCategory           String?                  // e.g., "Quote Request", "Billing Issue", "Appointment"
+
+  assignedToId          String?
+  assignedAt            DateTime?
+  queueId               String?
+  lastMessageAt         DateTime?
+  lastCustomerMessageAt DateTime?
+  lastAgentMessageAt    DateTime?
+  firstResponseAt       DateTime?
+  firstResponseDue      DateTime?
+  unreadCount           Int                      @default(0)
+  messageCount          Int                      @default(0)
+  lastMessagePreview    String?
+  lastMessageChannel    ChannelAccountType?
+  customFields          Json?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime
+  closedAt              DateTime?
+  isStarred             Boolean                  @default(false)
+  assignedToTeamId      String?
+  resolutionDue         DateTime?
+  slaBreachedAt         DateTime?
+  slaPolicyId           String?
+  slaStatus             SLAStatus                @default(ON_TRACK)
+  snoozeReason          String?
+  snoozedAt             DateTime?
+  snoozedById           String?
+  snoozedUntil          DateTime?
+  call_sessions         CallSession[]
+  conversation_notes    conversation_notes[]
+  teams                 Team?                    @relation(fields: [assignedToTeamId], references: [id])
+  contacts              Contact?                 @relation(fields: [contactId], references: [id])
+  message_events        message_events[]
+
+  @@index([tenantId])
+  @@index([contactEmail])
+  @@index([contactPhone])
+  @@index([tenantId, assignedToId])
+  @@index([tenantId, assignedToTeamId])
+  @@index([tenantId, contactId])
+  @@index([tenantId, snoozedUntil])
+  @@index([tenantId, status])
+  @@index([tenantId, purpose])
+  @@map("conversation_threads")
+}
+
+model Template {
+  id              String              @id @default(cuid())
+  tenantId        String
+  channelId       String
+  name            String
+  externalId      String?
+  category        String
+  language        String              @default("en")
+  headerType      TemplateHeaderType?
+  headerContent   String?
+  bodyContent     String
+  footerContent   String?
+  buttons         Json?
+  variables       Json?
+  status          TemplateStatus      @default(PENDING)
+  rejectionReason String?
+  sentCount       Int                 @default(0)
+  deliveredCount  Int                 @default(0)
+  readCount       Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  approvedAt      DateTime?
+  type            String?
+  content         String?
+  subject         String?
+  isActive        Boolean?            @default(true)
+  channels        Channel             @relation(fields: [channelId], references: [id])
+
+  @@unique([tenantId, channelId, name])
+  @@index([tenantId])
+  @@map("templates")
+}
+
+model EmailAccount {
+  id                String             @id @default(cuid())
+  tenantId          String
+  userId            String
+  email             String
+  displayName       String?
+  provider          EmailProvider      @default(IMAP)
+  providerAccountId String?
+  accessToken       String?
+  refreshToken      String?
+  tokenExpiresAt    DateTime?
+  scopes            String[]
+  imapHost          String?
+  imapPort          Int?
+  imapSecure        Boolean            @default(true)
+  smtpHost          String?
+  smtpPort          Int?
+  smtpSecure        Boolean            @default(true)
+  password          String?
+  syncEnabled       Boolean            @default(true)
+  syncFolders       String[]           @default(["INBOX", "Sent"])
+  lastSyncAt        DateTime?
+  lastSyncError     String?
+  syncState         Json?
+  status            EmailAccountStatus @default(ACTIVE)
+  isDefault         Boolean            @default(false)
+  isPrimary         Boolean            @default(false)
+  signature         String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@unique([userId, email])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([tenantId, email])
+  @@map("email_accounts")
+}
+
+model Signature {
+  id            String           @id @default(cuid())
+  tenantId      String
+  userId        String
+  name          String
+  content       String
+  channel       SignatureChannel @default(ALL)
+  isDefault     Boolean          @default(false)
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  links         Json?
+  logoUrl       String?
+  signatureType String?          @default("text")
+  users         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, name])
+  @@index([tenantId])
+  @@index([tenantId, userId, channel])
+  @@index([tenantId, userId])
+  @@map("signatures")
+}
+
+model CallSession {
+  id                   String              @id @default(cuid())
+  tenantId             String
+  threadId             String?
+  channelAccountId     String
+  contactId            String?
+  direction            CallDirection
+  fromNumber           String
+  toNumber             String
+  maskedNumber         String?
+  initiatedAt          DateTime            @default(now())
+  answeredAt           DateTime?
+  endedAt              DateTime?
+  duration             Int?
+  status               CallStatus          @default(INITIATED)
+  endReason            String?
+  recordingUrl         String?
+  recordingDuration    Int?
+  transcription        String?
+  agentId              String?
+  disposition          String?
+  costAmount           Decimal?            @db.Decimal(10, 6)
+  costCurrency         String?
+  usageEventId         String?
+  providerCallId       String?
+  providerData         Json?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  dealId               String?
+  errorMessage         String?
+  externalId           String?
+  leadId               String?
+  metadata             Json?
+  userId               String?
+  workspaceId          String?
+  notes                Json?
+  channel_accounts     ChannelAccount      @relation(fields: [channelAccountId], references: [id])
+  contact              Contact?            @relation(fields: [contactId], references: [id])
+  lead                 Lead?               @relation(fields: [leadId], references: [id])
+  tenants              Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation_threads ConversationThread? @relation(fields: [threadId], references: [id])
+  users                User?               @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([contactId])
+  @@index([initiatedAt])
+  @@index([leadId])
+  @@index([threadId])
+  @@index([workspaceId])
+  @@map("call_sessions")
+}
+
+model Plan {
+  id                String         @id @default(cuid())
+  name              String         @unique
+  displayName       String
+  description       String?
+  monthlyPrice      Decimal        @db.Decimal(15, 2)
+  yearlyPrice       Decimal        @db.Decimal(15, 2)
+  currency          String         @default("INR")
+  maxUsers          Int?
+  maxContacts       Int?
+  features          Json
+  isActive          Boolean        @default(true)
+  isPublic          Boolean        @default(true)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  badge             String?
+  maxAutomations    Int?
+  maxCompanies      Int?
+  maxDeals          Int?
+  maxEmailsPerDay   Int?
+  maxPipelines      Int?
+  maxSmsPerDay      Int?
+  maxWhatsAppPerDay Int?
+  modules           Json
+  sortOrder         Int            @default(0)
+  storageGb         Int            @default(1)
+  subscriptions     Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  tenantId             String
+  planId               String
+  status               SubscriptionStatus @default(TRIALING)
+  billingCycle         BillingCycle       @default(MONTHLY)
+  startDate            DateTime           @default(now())
+  endDate              DateTime?
+  trialEndsAt          DateTime?
+  cancelledAt          DateTime?
+  seats                Int                @default(1)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  plan                 Plan               @relation(fields: [planId], references: [id])
+  tenant               Tenant             @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@map("subscriptions")
+}
+
+model Team {
+  id                   String               @id @default(cuid())
+  tenantId             String
+  name                 String
+  description          String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  autoAssignmentRules  AutoAssignmentRule[]
+  conversation_threads ConversationThread[]
+  members              TeamMember[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  teamId    String
+  userId    String
+  role      TeamRole @default(MEMBER)
+  createdAt DateTime @default(now())
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@map("team_members")
+}
+
+model CannedResponseCategory {
+  id        String           @id @default(cuid())
+  tenantId  String
+  name      String
+  icon      String?          @default("📁")
+  color     String?          @default("blue")
+  order     Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  responses CannedResponse[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("canned_response_categories")
+}
+
+model CannedResponse {
+  id          String                   @id @default(cuid())
+  tenantId    String
+  categoryId  String?
+  title       String
+  shortcut    String
+  content     String
+  variables   Json?
+  visibility  CannedResponseVisibility @default(TEAM)
+  isFavorite  Boolean                  @default(false)
+  usageCount  Int                      @default(0)
+  createdById String
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  category    CannedResponseCategory?  @relation(fields: [categoryId], references: [id])
+
+  @@unique([tenantId, shortcut])
+  @@index([tenantId])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, visibility])
+  @@map("canned_responses")
+}
+
+model AutoAssignmentRule {
+  id               String               @id @default(cuid())
+  tenantId         String
+  name             String
+  description      String?
+  priority         Int                  @default(0)
+  isActive         Boolean              @default(true)
+  conditions       Json
+  assignToType     AssignmentTargetType
+  assignToUserId   String?
+  assignToTeamId   String?
+  roundRobinConfig Json?
+  matchedCount     Int                  @default(0)
+  assignedCount    Int                  @default(0)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  assignToTeam     Team?                @relation(fields: [assignToTeamId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@map("auto_assignment_rules")
+}
+
+// Auto-classification rules for inbox purpose segmentation
+model InboxClassificationRule {
+  id            String              @id @default(cuid())
+  tenantId      String
+  name          String
+  description   String?
+  priority      Int                 @default(0)  // Higher priority checked first
+  isActive      Boolean             @default(true)
+
+  // Conditions (JSON structure)
+  // { keywords: string[], channels: ChannelAccountType[], contactTags: string[], contactSources: string[] }
+  conditions    Json
+
+  // Action: Set purpose when conditions match
+  setPurpose    ConversationPurpose
+  setSubCategory String?            // Optional sub-category to set
+  setTeamId     String?             // Optional team to assign
+
+  // Stats
+  matchedCount  Int                 @default(0)
+  appliedCount  Int                 @default(0)
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@map("inbox_classification_rules")
+}
+
+model TrackingScript {
+  id           String           @id @default(cuid())
+  tenantId     String
+  name         String
+  domain       String
+  apiKey       String           @unique @default(cuid())
+  secretKey    String           @default(cuid())
+  settings     Json?
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  linkTrackers LinkTracker[]
+  pageViews    PageView[]
+  events       VisitorEvent[]
+  sessions     VisitorSession[]
+
+  @@unique([tenantId, domain])
+  @@index([tenantId])
+  @@index([apiKey])
+  @@map("tracking_scripts")
+}
+
+model VisitorSession {
+  id               String             @id @default(cuid())
+  tenantId         String
+  trackingScriptId String?
+  contactId        String?
+  companyId        String?
+  visitorId        String
+  fingerprint      String?
+  isIdentified     Boolean            @default(false)
+  identifiedAt     DateTime?
+  startedAt        DateTime           @default(now())
+  endedAt          DateTime?
+  lastActiveAt     DateTime           @default(now())
+  duration         Int?
+  userAgent        String?
+  browser          String?
+  browserVersion   String?
+  os               String?
+  osVersion        String?
+  deviceType       String?
+  deviceBrand      String?
+  screenWidth      Int?
+  screenHeight     Int?
+  viewportWidth    Int?
+  viewportHeight   Int?
+  ipAddress        String?
+  country          String?
+  countryCode      String?
+  region           String?
+  city             String?
+  postalCode       String?
+  latitude         Decimal?           @db.Decimal(10, 8)
+  longitude        Decimal?           @db.Decimal(11, 8)
+  timezone         String?
+  isp              String?
+  organization     String?
+  referrer         String?
+  referrerDomain   String?
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmTerm          String?
+  utmContent       String?
+  pageViewCount    Int                @default(0)
+  eventCount       Int                @default(0)
+  bounced          Boolean            @default(true)
+  engaged          Boolean            @default(false)
+  entryPage        String?
+  exitPage         String?
+  landingPageTitle String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  formSubmissions  FormSubmission[]
+  pageViews        PageView[]
+  recordings       SessionRecording[]
+  events           VisitorEvent[]
+  company          Company?           @relation("CompanySessions", fields: [companyId], references: [id])
+  contact          Contact?           @relation("ContactSessions", fields: [contactId], references: [id])
+  trackingScript   TrackingScript?    @relation(fields: [trackingScriptId], references: [id])
+
+  @@index([tenantId])
+  @@index([trackingScriptId])
+  @@index([visitorId])
+  @@index([contactId])
+  @@index([companyId])
+  @@index([startedAt])
+  @@index([ipAddress])
+  @@map("visitor_sessions")
+}
+
+model PageView {
+  id               String          @id @default(cuid())
+  tenantId         String
+  trackingScriptId String?
+  sessionId        String
+  contactId        String?
+  url              String
+  path             String
+  title            String?
+  referrer         String?
+  timestamp        DateTime        @default(now())
+  timeOnPage       Int?
+  loadTime         Int?
+  scrollDepth      Int?
+  scrollEvents     Int             @default(0)
+  clicks           Int             @default(0)
+  keystrokes       Int             @default(0)
+  mouseMovements   Int             @default(0)
+  metadata         Json?
+  contact          Contact?        @relation("ContactPageViews", fields: [contactId], references: [id])
+  session          VisitorSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  trackingScript   TrackingScript? @relation(fields: [trackingScriptId], references: [id])
+
+  @@index([tenantId])
+  @@index([sessionId])
+  @@index([contactId])
+  @@index([timestamp])
+  @@index([path])
+  @@map("page_views")
+}
+
+model VisitorEvent {
+  id               String          @id @default(cuid())
+  tenantId         String
+  trackingScriptId String?
+  sessionId        String
+  pageViewId       String?
+  contactId        String?
+  eventType        String
+  eventName        String
+  category         String?
+  targetSelector   String?
+  targetText       String?
+  targetHref       String?
+  pageX            Int?
+  pageY            Int?
+  viewportX        Int?
+  viewportY        Int?
+  value            String?
+  numericValue     Decimal?        @db.Decimal(15, 4)
+  metadata         Json?
+  timestamp        DateTime        @default(now())
+  contact          Contact?        @relation("ContactEvents", fields: [contactId], references: [id])
+  session          VisitorSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  trackingScript   TrackingScript? @relation(fields: [trackingScriptId], references: [id])
+
+  @@index([tenantId])
+  @@index([sessionId])
+  @@index([contactId])
+  @@index([eventType])
+  @@index([eventName])
+  @@index([timestamp])
+  @@map("visitor_events")
+}
+
+model SessionRecording {
+  id             String         @id @default(cuid())
+  tenantId       String
+  sessionId      String
+  startedAt      DateTime
+  endedAt        DateTime?
+  duration       Int?
+  eventsData     Json
+  eventCount     Int            @default(0)
+  compressedSize Int?
+  rawSize        Int?
+  status         String         @default("recording")
+  hasErrors      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  session        VisitorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([sessionId])
+  @@index([startedAt])
+  @@map("session_recordings")
+}
+
+model FormSubmission {
+  id             String         @id @default(cuid())
+  tenantId       String
+  sessionId      String
+  contactId      String?
+  formId         String?
+  formName       String?
+  formUrl        String?
+  fields         Json
+  startedAt      DateTime?
+  submittedAt    DateTime       @default(now())
+  timeToComplete Int?
+  successful     Boolean        @default(true)
+  errorMessage   String?
+  createdAt      DateTime       @default(now())
+  contact        Contact?       @relation("ContactFormSubmissions", fields: [contactId], references: [id])
+  session        VisitorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([sessionId])
+  @@index([contactId])
+  @@index([submittedAt])
+  @@map("form_submissions")
+}
+
+model LinkTracker {
+  id               String          @id @default(cuid())
+  tenantId         String
+  trackingScriptId String?
+  shortCode        String          @unique
+  originalUrl      String
+  name             String?
+  description      String?
+  campaign         String?
+  source           String?
+  medium           String?
+  isActive         Boolean         @default(true)
+  expiresAt        DateTime?
+  maxClicks        Int?
+  password         String?
+  clickCount       Int             @default(0)
+  uniqueClicks     Int             @default(0)
+  lastClickedAt    DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  clicks           LinkClick[]
+  trackingScript   TrackingScript? @relation(fields: [trackingScriptId], references: [id])
+
+  @@index([tenantId])
+  @@index([shortCode])
+  @@index([trackingScriptId])
+  @@map("link_trackers")
+}
+
+model LinkClick {
+  id            String      @id @default(cuid())
+  tenantId      String
+  linkTrackerId String
+  sessionId     String?
+  contactId     String?
+  timestamp     DateTime    @default(now())
+  ipAddress     String?
+  userAgent     String?
+  referrer      String?
+  country       String?
+  city          String?
+  deviceType    String?
+  browser       String?
+  os            String?
+  contact       Contact?    @relation("ContactLinkClicks", fields: [contactId], references: [id])
+  linkTracker   LinkTracker @relation(fields: [linkTrackerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([linkTrackerId])
+  @@index([contactId])
+  @@index([timestamp])
+  @@map("link_clicks")
+}
+
+model api_keys {
+  id         String       @id
+  tenantId   String
+  userId     String
+  name       String
+  keyHash    String       @unique
+  keyPrefix  String
+  scopes     String[]
+  rateLimit  Int          @default(1000)
+  status     ApiKeyStatus @default(ACTIVE)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  createdAt  DateTime     @default(now())
+  users      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@index([tenantId])
+}
+
+model audit_logs {
+  id         String   @id
+  tenantId   String
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  requestId  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model broadcast_recipients {
+  id            String                   @id
+  broadcastId   String
+  contactId     String?
+  phone         String?
+  email         String?
+  name          String?
+  variables     Json?
+  status        BroadcastRecipientStatus @default(PENDING)
+  externalMsgId String?
+  sentAt        DateTime?
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  failedAt      DateTime?
+  failureReason String?
+  clickedAt     DateTime?
+  repliedAt     DateTime?
+  optedOutAt    DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime
+  broadcasts    broadcasts               @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@index([broadcastId])
+  @@index([broadcastId, status])
+  @@index([contactId])
+  @@index([externalMsgId])
+}
+
+model broadcasts {
+  id                   String                 @id
+  tenantId             String
+  name                 String
+  description          String?
+  channelAccountId     String
+  templateId           String?
+  content              String?
+  segmentId            String?
+  totalRecipients      Int                    @default(0)
+  scheduledAt          DateTime?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  status               BroadcastStatus        @default(DRAFT)
+  sentCount            Int                    @default(0)
+  deliveredCount       Int                    @default(0)
+  readCount            Int                    @default(0)
+  failedCount          Int                    @default(0)
+  createdById          String
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  actualCost           Decimal?               @db.Decimal(10, 2)
+  audienceFilter       Json?
+  audienceType         AudienceType           @default(CONTACTS)
+  channel              BroadcastChannel
+  clickCount           Int                    @default(0)
+  contentHtml          String?
+  estimatedCost        Decimal?               @db.Decimal(10, 2)
+  optOutCount          Int                    @default(0)
+  replyCount           Int                    @default(0)
+  subject              String?
+  templateName         String?
+  timezone             String                 @default("UTC")
+  contactIds           Json?
+  campaignId           String?
+  activities           Activity[]
+  broadcast_recipients broadcast_recipients[]
+  marketing_campaigns  marketing_campaigns?   @relation(fields: [campaignId], references: [id])
+
+  @@index([tenantId, campaignId])
+  @@index([tenantId, channel])
+  @@index([tenantId])
+  @@index([tenantId, scheduledAt])
+  @@index([tenantId, status])
+}
+
+model chatbots {
+  id                 String      @id
+  tenantId           String
+  name               String
+  description        String?
+  channelType        ChannelType
+  welcomeMessage     String?
+  fallbackMessage    String?
+  handoffMessage     String?
+  handoffTriggers    String[]
+  flowConfig         Json?
+  isActive           Boolean     @default(false)
+  totalSessions      Int         @default(0)
+  avgSessionDuration Int?
+  handoffRate        Decimal?    @db.Decimal(5, 2)
+  createdById        String
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model consents {
+  id        String             @id
+  tenantId  String
+  contactId String
+  channel   ChannelAccountType
+  type      ConsentType
+  status    ConsentStatus      @default(PENDING)
+  method    String?
+  proofUrl  String?
+  ipAddress String?
+  userAgent String?
+  grantedAt DateTime?
+  revokedAt DateTime?
+  expiresAt DateTime?
+  source    String?
+  metadata  Json?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime
+
+  @@index([contactId])
+  @@index([tenantId, channel])
+  @@index([tenantId])
+}
+
+model conversation_notes {
+  id                   String             @id
+  tenantId             String
+  threadId             String
+  userId               String
+  content              String
+  isPinned             Boolean            @default(false)
+  mentions             String[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime
+  conversation_threads ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([threadId])
+}
+
+model conversation_tags {
+  id             String       @id
+  conversationId String
+  tagId          String
+  createdAt      DateTime     @default(now())
+  conversations  Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  tags           Tag          @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, tagId])
+}
+
+model custom_fields {
+  id           String            @id
+  tenantId     String
+  entityType   CustomFieldEntity
+  name         String
+  apiName      String
+  fieldType    CustomFieldType
+  description  String?
+  isRequired   Boolean           @default(false)
+  isActive     Boolean           @default(true)
+  options      Json?
+  defaultValue String?
+  placeholder  String?
+  sortOrder    Int               @default(0)
+  createdById  String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime
+
+  @@unique([tenantId, entityType, apiName])
+  @@index([tenantId, entityType])
+}
+
+model DealProduct {
+  id        String   @id
+  dealId    String
+  productId String
+  quantity  Int      @default(1)
+  unitPrice Decimal  @db.Decimal(15, 2)
+  discount  Decimal? @db.Decimal(15, 2)
+  createdAt DateTime @default(now())
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@unique([dealId, productId])
+  @@map("deal_products")
+}
+
+model email_account_access {
+  id             String                @id
+  emailAccountId String
+  userId         String?
+  teamId         String?
+  permission     EmailAccessPermission @default(READ_REPLY)
+  grantedBy      String
+  grantedAt      DateTime              @default(now())
+  expiresAt      DateTime?
+
+  @@unique([emailAccountId, teamId])
+  @@unique([emailAccountId, userId])
+  @@index([emailAccountId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model email_provider_configs {
+  id                  String        @id
+  domain              String        @unique
+  provider            EmailProvider
+  name                String
+  authType            String        @default("oauth")
+  authUrl             String?
+  tokenUrl            String?
+  imapHost            String
+  imapPort            Int           @default(993)
+  imapSecure          Boolean       @default(true)
+  smtpHost            String
+  smtpPort            Int           @default(465)
+  smtpSecure          Boolean       @default(true)
+  smtpStartTls        Boolean       @default(false)
+  requiresAppPassword Boolean       @default(false)
+  requiresOAuth       Boolean       @default(false)
+  notes               String?
+  helpUrl             String?
+  isActive            Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime
+}
+
+model email_signatures {
+  id               String         @id
+  tenantId         String
+  channelAccountId String
+  name             String
+  htmlContent      String
+  textContent      String?
+  isDefault        Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime
+  channel_accounts ChannelAccount @relation(fields: [channelAccountId], references: [id])
+
+  @@unique([tenantId, channelAccountId, name])
+  @@index([tenantId])
+}
+
+model email_verification_tokens {
+  id        String    @id
+  token     String    @unique
+  userId    String
+  email     String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  users     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model EscalationRule {
+  id             String            @id
+  tenantId       String
+  slaPolicyId    String
+  name           String
+  triggerType    EscalationTrigger
+  triggerMinutes Int
+  notifyUserIds  String[]
+  assignToId     String?
+  isActive       Boolean           @default(true)
+  createdAt      DateTime          @default(now())
+  slaPolicy      SLAPolicy         @relation(fields: [slaPolicyId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("escalation_rules")
+}
+
+model InboxSLAPolicy {
+  id                  String   @id
+  tenantId            String
+  name                String
+  description         String?
+  isDefault           Boolean  @default(false)
+  isActive            Boolean  @default(true)
+  firstResponseTime   Int
+  firstResponseBreach Int?
+  resolutionTime      Int
+  resolutionBreach    Int?
+  useBusinessHours    Boolean  @default(true)
+  businessHoursConfig Json?
+  priorityOverrides   Json?
+  escalationEnabled   Boolean  @default(false)
+  escalationConfig    Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("inbox_sla_policies")
+}
+
+model integrations {
+  id             String            @id
+  tenantId       String
+  name           String
+  type           String
+  provider       String
+  status         IntegrationStatus @default(PENDING)
+  config         Json?
+  credentials    Json?
+  lastSyncAt     DateTime?
+  syncStatus     SyncStatus?
+  syncErrors     Json?
+  connectedById  String
+  disconnectedAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime
+  isValidated    Boolean           @default(false)
+  lastTestedAt   DateTime?
+  testResult     String?
+  users          User              @relation(fields: [connectedById], references: [id])
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+  @@index([tenantId, type])
+}
+
+model InvoiceLine {
+  id              String      @id
+  invoiceId       String
+  productId       String?
+  description     String
+  quantity        Decimal     @default(1) @db.Decimal(15, 3)
+  unitPrice       Decimal     @db.Decimal(15, 2)
+  taxRate         Decimal     @default(0) @db.Decimal(5, 2)
+  discountPercent Decimal     @default(0) @db.Decimal(5, 2)
+  discountAmount  Decimal     @default(0) @db.Decimal(15, 2)
+  totalPrice      Decimal     @db.Decimal(15, 2)
+  order           Int         @default(0)
+  hsnCode         String?
+  sacCode         String?
+  unit            String?
+  productType     ProductType @default(GOODS)
+  taxableValue    Decimal     @default(0) @db.Decimal(15, 2)
+  cgstRate        Decimal     @default(0) @db.Decimal(5, 2)
+  cgstAmount      Decimal     @default(0) @db.Decimal(15, 2)
+  sgstRate        Decimal     @default(0) @db.Decimal(5, 2)
+  sgstAmount      Decimal     @default(0) @db.Decimal(15, 2)
+  igstRate        Decimal     @default(0) @db.Decimal(5, 2)
+  igstAmount      Decimal     @default(0) @db.Decimal(15, 2)
+  cessRate        Decimal     @default(0) @db.Decimal(5, 2)
+  cessAmount      Decimal     @default(0) @db.Decimal(15, 2)
+  totalTax        Decimal     @default(0) @db.Decimal(15, 2)
+  isTaxExempt     Boolean     @default(false)
+  exemptReason    String?
+  invoice         Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product         Product?    @relation(fields: [productId], references: [id])
+
+  @@index([invoiceId])
+  @@map("invoice_lines")
+}
+
+model Invoice {
+  id                   String          @id
+  tenantId             String
+  invoiceNumber        String
+  contactId            String?
+  quoteId              String?         @unique
+  status               InvoiceStatus   @default(DRAFT)
+  issueDate            DateTime        @default(now())
+  dueDate              DateTime
+  paidAt               DateTime?
+  subtotal             Decimal         @default(0) @db.Decimal(15, 2)
+  taxAmount            Decimal         @default(0) @db.Decimal(15, 2)
+  discountAmount       Decimal         @default(0) @db.Decimal(15, 2)
+  totalAmount          Decimal         @default(0) @db.Decimal(15, 2)
+  paidAmount           Decimal         @default(0) @db.Decimal(15, 2)
+  balanceDue           Decimal         @default(0) @db.Decimal(15, 2)
+  currency             String          @default("USD")
+  paymentLink          String?
+  paymentLinkExpiresAt DateTime?
+  notes                String?
+  terms                String?
+  pdfUrl               String?
+  createdById          String
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime
+  isGstInvoice         Boolean         @default(false)
+  invoiceType          GstInvoiceType  @default(TAX_INVOICE)
+  supplyType           SupplyType      @default(B2B)
+  sellerGstin          String?
+  sellerLegalName      String?
+  sellerTradeName      String?
+  sellerAddress        String?
+  sellerStateCode      String?
+  sellerStateName      String?
+  buyerGstin           String?
+  buyerLegalName       String?
+  buyerTradeName       String?
+  buyerAddress         String?
+  buyerStateCode       String?
+  buyerStateName       String?
+  shipToName           String?
+  shipToAddress        String?
+  shipToStateCode      String?
+  shipToStateName      String?
+  shipToPincode        String?
+  placeOfSupply        String?
+  placeOfSupplyName    String?
+  isInterState         Boolean         @default(false)
+  taxableAmount        Decimal         @default(0) @db.Decimal(15, 2)
+  cgstAmount           Decimal         @default(0) @db.Decimal(15, 2)
+  sgstAmount           Decimal         @default(0) @db.Decimal(15, 2)
+  igstAmount           Decimal         @default(0) @db.Decimal(15, 2)
+  cessAmount           Decimal         @default(0) @db.Decimal(15, 2)
+  roundOffAmount       Decimal         @default(0) @db.Decimal(15, 2)
+  isReverseCharge      Boolean         @default(false)
+  eWayBillNumber       String?
+  eWayBillDate         DateTime?
+  eWayBillValidTill    DateTime?
+  transporterName      String?
+  transporterId        String?
+  transportDocNo       String?
+  transportDocDate     DateTime?
+  vehicleNumber        String?
+  vehicleType          String?
+  transportMode        TransportMode?
+  transportDistance    Int?
+  isEInvoice           Boolean         @default(false)
+  irn                  String?
+  irnGeneratedAt       DateTime?
+  irnStatus            EInvoiceStatus?
+  ackNumber            String?
+  ackDate              DateTime?
+  signedQrCode         String?
+  signedInvoice        String?
+  taxPayerId           String?
+  originalInvoiceNo    String?
+  originalInvoiceDate  DateTime?
+  reasonForNote        String?
+  financialYear        String?
+  lines                InvoiceLine[]
+  contact              Contact?        @relation(fields: [contactId], references: [id])
+  quote                Quote?          @relation(fields: [quoteId], references: [id])
+  payments             Payment[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([irn])
+  @@index([tenantId, contactId])
+  @@index([tenantId])
+  @@index([tenantId, isGstInvoice])
+  @@index([tenantId, status])
+  @@map("invoices")
+}
+
+model Lead {
+  id                     String        @id
+  tenantId               String
+  firstName              String?
+  lastName               String?
+  email                  String?
+  phone                  String?
+  mobilePhone            String?
+  company                String?
+  jobTitle               String?
+  department             String?
+  industry               String?
+  annualRevenue          Decimal?      @db.Decimal(15, 2)
+  numberOfEmployees      Int?
+  companyWebsite         String?
+  source                 String?
+  sourceDetails          Json?
+  referredBy             String?
+  campaign               String?
+  medium                 String?
+  adCampaign             String?
+  status                 LeadStatus    @default(NEW)
+  rating                 LeadRating?
+  priority               LeadPriority?
+  qualificationScore     Int?
+  qualificationNotes     String?
+  isQualified            Boolean       @default(false)
+  qualifiedDate          DateTime?
+  disqualificationReason String?
+  personaType            String?
+  buyingRole             String?
+  expectedRevenue        Decimal?      @db.Decimal(15, 2)
+  winProbability         Int?
+  isTargetAccount        Boolean       @default(false)
+  firstOutreachDate      DateTime?
+  lastContactedDate      DateTime?
+  lastEngagementDate     DateTime?
+  lastEngagementType     String?
+  emailCount             Int           @default(0)
+  callCount              Int           @default(0)
+  meetingCount           Int           @default(0)
+  nextActivityDate       DateTime?
+  followUpDate           DateTime?
+  territory              String?
+  segment                String?
+  ownerId                String?
+  convertedAt            DateTime?
+  convertedToContactId   String?       @unique
+  convertedToDealId      String?       @unique
+  street                 String?
+  city                   String?
+  state                  String?
+  country                String?
+  postalCode             String?
+  linkedinUrl            String?
+  twitterUrl             String?
+  customFields           Json?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime
+  callSessions           CallSession[]
+  convertedToContact     Contact?      @relation(fields: [convertedToContactId], references: [id])
+  convertedToDeal        Deal?         @relation(fields: [convertedToDealId], references: [id])
+  owner                  User?         @relation(fields: [ownerId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, priority])
+  @@index([tenantId, rating])
+  @@index([tenantId, source])
+  @@index([tenantId, status])
+  @@map("leads")
+}
+
+model marketing_campaigns {
+  id                String                  @id
+  tenantId          String
+  name              String
+  description       String?
+  type              MarketingCampaignType
+  status            MarketingCampaignStatus @default(DRAFT)
+  channels          Json
+  goal              String?
+  targetAudience    AudienceType?
+  segmentId         String?
+  audienceFilter    Json?
+  startDate         DateTime?
+  endDate           DateTime?
+  timezone          String                  @default("UTC")
+  budget            Decimal?                @db.Decimal(15, 2)
+  actualCost        Decimal?                @db.Decimal(15, 2)
+  totalRecipients   Int                     @default(0)
+  sentCount         Int                     @default(0)
+  deliveredCount    Int                     @default(0)
+  openedCount       Int                     @default(0)
+  clickedCount      Int                     @default(0)
+  convertedCount    Int                     @default(0)
+  unsubscribedCount Int                     @default(0)
+  attributedRevenue Decimal?                @db.Decimal(15, 2)
+  tags              String[]
+  metadata          Json?
+  createdById       String
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime
+  activities        Activity[]
+  broadcasts        broadcasts[]
+  sequences         sequences[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, startDate])
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+}
+
+model message_events {
+  id                   String             @id
+  tenantId             String
+  threadId             String
+  channelAccountId     String
+  channel              ChannelAccountType
+  direction            MessageDirection
+  providerMessageId    String?
+  providerStatus       String?
+  idempotencyKey       String?
+  contentType          MessageContentType
+  textContent          String?
+  htmlContent          String?
+  subject              String?
+  mediaUrl             String?
+  mediaType            String?
+  mediaMimeType        String?
+  mediaSize            Int?
+  templateId           String?
+  templateName         String?
+  templateParams       Json?
+  emailFrom            String?
+  emailTo              String[]
+  emailCc              String[]
+  emailBcc             String[]
+  emailReplyTo         String?
+  emailHeaders         Json?
+  emailAttachments     Json?
+  status               MessageEventStatus @default(PENDING)
+  sentAt               DateTime?
+  deliveredAt          DateTime?
+  readAt               DateTime?
+  failedAt             DateTime?
+  failureReason        String?
+  failureCode          String?
+  retryCount           Int                @default(0)
+  nextRetryAt          DateTime?
+  costAmount           Decimal?           @db.Decimal(10, 6)
+  costCurrency         String?
+  billedAt             DateTime?
+  usageEventId         String?
+  metadata             Json?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime
+  channel_accounts     ChannelAccount     @relation(fields: [channelAccountId], references: [id])
+  conversation_threads ConversationThread @relation(fields: [threadId], references: [id])
+
+  @@unique([tenantId, idempotencyKey])
+  @@unique([tenantId, providerMessageId, channel])
+  @@index([createdAt])
+  @@index([tenantId, channel])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([threadId])
+}
+
+model Milestone {
+  id          String          @id
+  tenantId    String
+  projectId   String
+  name        String
+  description String?
+  dueDate     DateTime?
+  status      MilestoneStatus @default(PENDING)
+  order       Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime
+  completedAt DateTime?
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@index([tenantId])
+  @@map("milestones")
+}
+
+model onboarding_progress {
+  id                   String    @id
+  tenantId             String    @unique
+  currentStep          Int       @default(1)
+  totalSteps           Int       @default(6)
+  completedAt          DateTime?
+  steps                Json      @default("{}")
+  companyInfoComplete  Boolean   @default(false)
+  planSelected         Boolean   @default(false)
+  paymentComplete      Boolean   @default(false)
+  channelSetupComplete Boolean   @default(false)
+  teamInviteComplete   Boolean   @default(false)
+  dataImportComplete   Boolean   @default(false)
+  startedAt            DateTime  @default(now())
+  lastActivityAt       DateTime  @default(now())
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime
+  tenants              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model onboarding_steps {
+  id          String   @id
+  order       Int      @unique
+  name        String   @unique
+  title       String
+  description String?
+  isRequired  Boolean  @default(true)
+  isSkippable Boolean  @default(false)
+  icon        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+}
+
+model opt_outs {
+  id         String             @id
+  tenantId   String
+  identifier String
+  channel    ChannelAccountType
+  reason     String?
+  source     String?
+  optedOutAt DateTime           @default(now())
+  createdAt  DateTime           @default(now())
+
+  @@unique([tenantId, identifier, channel])
+  @@index([identifier])
+  @@index([tenantId])
+}
+
+model password_reset_tokens {
+  id        String    @id
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  users     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model Payment {
+  id                String        @id
+  tenantId          String
+  invoiceId         String
+  amount            Decimal       @db.Decimal(15, 2)
+  currency          String
+  method            PaymentMethod
+  providerPaymentId String?
+  providerData      Json?
+  status            PaymentStatus @default(PENDING)
+  createdAt         DateTime      @default(now())
+  processedAt       DateTime?
+  invoice           Invoice       @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([tenantId])
+  @@map("payments")
+}
+
+model platform_audit_logs {
+  id           String      @id
+  superAdminId String?
+  action       String
+  entityType   String?
+  entityId     String?
+  details      Json?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime    @default(now())
+  super_admins SuperAdmin? @relation(fields: [superAdminId], references: [id])
+
+  @@index([action])
+  @@index([createdAt])
+  @@index([entityType, entityId])
+  @@index([superAdminId])
+}
+
+model Product {
+  id              String         @id
+  tenantId        String
+  name            String
+  description     String?
+  sku             String?
+  unitPrice       Decimal        @db.Decimal(15, 2)
+  currency        String         @default("USD")
+  taxRate         Decimal?       @db.Decimal(5, 2)
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime
+  hsnCode         String?
+  sacCode         String?
+  productType     ProductType    @default(GOODS)
+  gstRate         Decimal?       @db.Decimal(5, 2)
+  cessRate        Decimal?       @db.Decimal(5, 2)
+  unit            String?
+  isTaxExempt     Boolean        @default(false)
+  taxExemptReason String?
+  dealProducts    DealProduct[]
+  invoiceLines    InvoiceLine[]
+  quoteLines      QuoteLine[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+  @@map("products")
+}
+
+model ProjectMember {
+  id        String            @id
+  projectId String
+  userId    String
+  role      ProjectMemberRole @default(MEMBER)
+  createdAt DateTime          @default(now())
+  project   Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@map("project_members")
+}
+
+model Project {
+  id              String          @id
+  tenantId        String
+  name            String
+  description     String?
+  status          ProjectStatus   @default(PLANNING)
+  priority        Priority        @default(MEDIUM)
+  startDate       DateTime?
+  endDate         DateTime?
+  actualStartDate DateTime?
+  actualEndDate   DateTime?
+  budget          Decimal?        @db.Decimal(15, 2)
+  currency        String          @default("USD")
+  actualCost      Decimal?        @db.Decimal(15, 2)
+  progress        Int             @default(0)
+  clientId        String?
+  ownerId         String?
+  color           String          @default("#6366f1")
+  customFields    Json?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  completedAt     DateTime?
+  milestones      Milestone[]
+  members         ProjectMember[]
+  tasks           Task[]
+  timeEntries     TimeEntry[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, ownerId])
+  @@index([tenantId, status])
+  @@map("projects")
+}
+
+model QuoteLine {
+  id              String      @id
+  quoteId         String
+  productId       String?
+  description     String
+  quantity        Decimal     @default(1) @db.Decimal(15, 3)
+  unitPrice       Decimal     @db.Decimal(15, 2)
+  taxRate         Decimal     @default(0) @db.Decimal(5, 2)
+  discountPercent Decimal     @default(0) @db.Decimal(5, 2)
+  discountAmount  Decimal     @default(0) @db.Decimal(15, 2)
+  totalPrice      Decimal     @db.Decimal(15, 2)
+  order           Int         @default(0)
+  hsnCode         String?
+  sacCode         String?
+  unit            String?
+  productType     ProductType @default(GOODS)
+  taxableValue    Decimal     @default(0) @db.Decimal(15, 2)
+  cgstRate        Decimal     @default(0) @db.Decimal(5, 2)
+  cgstAmount      Decimal     @default(0) @db.Decimal(15, 2)
+  sgstRate        Decimal     @default(0) @db.Decimal(5, 2)
+  sgstAmount      Decimal     @default(0) @db.Decimal(15, 2)
+  igstRate        Decimal     @default(0) @db.Decimal(5, 2)
+  igstAmount      Decimal     @default(0) @db.Decimal(15, 2)
+  cessRate        Decimal     @default(0) @db.Decimal(5, 2)
+  cessAmount      Decimal     @default(0) @db.Decimal(15, 2)
+  totalTax        Decimal     @default(0) @db.Decimal(15, 2)
+  isTaxExempt     Boolean     @default(false)
+  exemptReason    String?
+  product         Product?    @relation(fields: [productId], references: [id])
+  quote           Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId])
+  @@map("quote_lines")
+}
+
+model Quote {
+  id              String       @id
+  tenantId        String
+  quoteNumber     String
+  contactId       String?
+  dealId          String?
+  status          QuoteStatus  @default(DRAFT)
+  issueDate       DateTime     @default(now())
+  expiryDate      DateTime?
+  acceptedAt      DateTime?
+  subtotal        Decimal      @default(0) @db.Decimal(15, 2)
+  taxAmount       Decimal      @default(0) @db.Decimal(15, 2)
+  discountAmount  Decimal      @default(0) @db.Decimal(15, 2)
+  totalAmount     Decimal      @default(0) @db.Decimal(15, 2)
+  currency        String       @default("USD")
+  notes           String?
+  terms           String?
+  pdfUrl          String?
+  createdById     String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime
+  isGstQuote      Boolean      @default(false)
+  supplyType      SupplyType   @default(B2B)
+  sellerGstin     String?
+  sellerLegalName String?
+  sellerAddress   String?
+  sellerStateCode String?
+  buyerGstin      String?
+  buyerLegalName  String?
+  buyerAddress    String?
+  buyerStateCode  String?
+  placeOfSupply   String?
+  isInterState    Boolean      @default(false)
+  taxableAmount   Decimal      @default(0) @db.Decimal(15, 2)
+  cgstAmount      Decimal      @default(0) @db.Decimal(15, 2)
+  sgstAmount      Decimal      @default(0) @db.Decimal(15, 2)
+  igstAmount      Decimal      @default(0) @db.Decimal(15, 2)
+  cessAmount      Decimal      @default(0) @db.Decimal(15, 2)
+  roundOffAmount  Decimal      @default(0) @db.Decimal(15, 2)
+  isReverseCharge Boolean      @default(false)
+  invoice         Invoice?
+  lines           QuoteLine[]
+  contact         Contact?     @relation(fields: [contactId], references: [id])
+  deal            Deal?        @relation(fields: [dealId], references: [id])
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId, contactId])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("quotes")
+}
+
+model rate_limit_states {
+  id           String    @id
+  tenantId     String
+  resourceType String
+  resourceId   String
+  windowStart  DateTime
+  windowEnd    DateTime
+  requestCount Int       @default(0)
+  maxRequests  Int
+  isBlocked    Boolean   @default(false)
+  blockedUntil DateTime?
+  updatedAt    DateTime
+
+  @@unique([tenantId, resourceType, resourceId, windowStart])
+  @@index([tenantId])
+}
+
+model routing_rules {
+  id           String       @id
+  tenantId     String
+  name         String
+  description  String?
+  priority     Int          @default(0)
+  conditions   Json
+  assignToType AssignToType
+  assignToId   String?
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime
+
+  @@index([tenantId])
+}
+
+model segments {
+  id           String      @id
+  tenantId     String
+  name         String
+  description  String?
+  type         SegmentType @default(STATIC)
+  conditions   Json?
+  contactIds   String[]
+  contactCount Int         @default(0)
+  isActive     Boolean     @default(true)
+  createdById  String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime
+  lastSyncAt   DateTime?
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model sequence_enrollments {
+  id                 String                   @id
+  tenantId           String
+  sequenceId         String
+  contactId          String?
+  leadId             String?
+  dealId             String?
+  status             SequenceEnrollmentStatus @default(ACTIVE)
+  currentStep        Int                      @default(0)
+  enrolledAt         DateTime                 @default(now())
+  pausedAt           DateTime?
+  completedAt        DateTime?
+  exitedAt           DateTime?
+  exitReason         String?
+  stepsCompleted     Int                      @default(0)
+  lastStepAt         DateTime?
+  nextStepAt         DateTime?
+  enrolledById       String?
+  source             String?
+  sequences          sequences                @relation(fields: [sequenceId], references: [id])
+  sequence_step_runs sequence_step_runs[]
+
+  @@unique([sequenceId, contactId])
+  @@unique([sequenceId, dealId])
+  @@unique([sequenceId, leadId])
+  @@index([sequenceId])
+  @@index([status])
+  @@index([tenantId])
+}
+
+model sequence_step_runs {
+  id                   String                @id
+  tenantId             String
+  enrollmentId         String
+  stepId               String
+  status               SequenceStepRunStatus @default(PENDING)
+  scheduledAt          DateTime
+  startedAt            DateTime?
+  completedAt          DateTime?
+  result               Json?
+  error                String?
+  retryCount           Int                   @default(0)
+  nextRetryAt          DateTime?
+  sequence_enrollments sequence_enrollments  @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  sequence_steps       sequence_steps        @relation(fields: [stepId], references: [id])
+
+  @@index([enrollmentId])
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([tenantId])
+}
+
+model sequence_steps {
+  id                 String               @id
+  sequenceId         String
+  order              Int
+  stepType           SequenceStepType
+  channel            ChannelAccountType?
+  delayDays          Int                  @default(0)
+  delayHours         Int                  @default(0)
+  delayMinutes       Int                  @default(0)
+  templateId         String?
+  subject            String?
+  content            String?
+  taskTitle          String?
+  taskNotes          String?
+  isABTest           Boolean              @default(false)
+  variants           Json?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  sequence_step_runs sequence_step_runs[]
+  sequences          sequences            @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+
+  @@unique([sequenceId, order])
+  @@index([sequenceId])
+}
+
+model sequences {
+  id                   String                 @id
+  tenantId             String
+  name                 String
+  description          String?
+  targetType           SequenceTarget         @default(CONTACT)
+  timezone             String                 @default("UTC")
+  businessHoursOnly    Boolean                @default(true)
+  workingHours         Json?
+  pauseOnReply         Boolean                @default(true)
+  dailyCap             Int?
+  throttlePerHour      Int?
+  isActive             Boolean                @default(false)
+  createdById          String
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  campaignId           String?
+  activities           Activity[]
+  sequence_enrollments sequence_enrollments[]
+  sequence_steps       sequence_steps[]
+  marketing_campaigns  marketing_campaigns?   @relation(fields: [campaignId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId, campaignId])
+  @@index([tenantId])
+}
+
+model shared_inbox_members {
+  id                   String         @id
+  sharedInboxId        String
+  userId               String
+  role                 String         @default("member")
+  canSend              Boolean        @default(true)
+  canAssign            Boolean        @default(false)
+  receiveNotifications Boolean        @default(true)
+  createdAt            DateTime       @default(now())
+  shared_inboxes       shared_inboxes @relation(fields: [sharedInboxId], references: [id], onDelete: Cascade)
+
+  @@unique([sharedInboxId, userId])
+}
+
+model shared_inboxes {
+  id                   String                 @id
+  tenantId             String
+  name                 String
+  email                String
+  inboundType          String                 @default("forwarding")
+  forwardingAddress    String?
+  accessToken          String?
+  refreshToken         String?
+  tokenExpiresAt       DateTime?
+  imapHost             String?
+  imapPort             Int?
+  password             String?
+  smtpProvider         String?
+  smtpApiKey           String?
+  smtpHost             String?
+  smtpPort             Int?
+  smtpUser             String?
+  smtpPassword         String?
+  autoAssign           Boolean                @default(false)
+  assignmentType       String                 @default("round_robin")
+  signature            String?
+  status               String                 @default("active")
+  lastSyncAt           DateTime?
+  lastSyncError        String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime
+  shared_inbox_members shared_inbox_members[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+model SLAPolicy {
+  id                String            @id
+  tenantId          String
+  name              String
+  description       String?
+  firstResponseTime Json
+  resolutionTime    Json
+  useBusinessHours  Boolean           @default(true)
+  isDefault         Boolean           @default(false)
+  isActive          Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime
+  escalationRules   EscalationRule[]
+  tickets           Ticket[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("sla_policies")
+}
+
+model sms_templates {
+  id                 String         @id
+  tenantId           String
+  channelAccountId   String
+  name               String
+  content            String
+  dltTemplateId      String?
+  dltStatus          DLTStatus      @default(PENDING)
+  dltApprovedAt      DateTime?
+  dltRejectionReason String?
+  variables          Json?
+  sentCount          Int            @default(0)
+  deliveredCount     Int            @default(0)
+  isActive           Boolean        @default(true)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime
+  channel_accounts   ChannelAccount @relation(fields: [channelAccountId], references: [id])
+
+  @@unique([tenantId, channelAccountId, name])
+  @@index([tenantId])
+}
+
+model spend_limits {
+  id           String         @id
+  tenantId     String
+  walletId     String
+  type         SpendLimitType
+  limitAmount  Decimal        @db.Decimal(15, 2)
+  currentSpend Decimal        @default(0) @db.Decimal(15, 2)
+  periodStart  DateTime
+  periodEnd    DateTime
+  hardLimit    Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  wallets      wallets        @relation(fields: [walletId], references: [id])
+
+  @@index([tenantId])
+  @@index([walletId])
+}
+
+model TaskAttachment {
+  id           String   @id
+  taskId       String
+  name         String
+  url          String
+  size         Int?
+  mimeType     String?
+  uploadedById String
+  createdAt    DateTime @default(now())
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_attachments")
+}
+
+model TaskChecklist {
+  id        String   @id
+  taskId    String
+  title     String
+  isChecked Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_checklists")
+}
+
+model TaskComment {
+  id        String   @id
+  tenantId  String
+  taskId    String
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([taskId])
+  @@index([userId])
+  @@map("task_comments")
+}
+
+model TaskDependency {
+  id              String         @id
+  dependentTaskId String
+  blockingTaskId  String
+  type            DependencyType @default(FINISH_TO_START)
+  createdAt       DateTime       @default(now())
+  blockingTask    Task           @relation("BlockingTask", fields: [blockingTaskId], references: [id], onDelete: Cascade)
+  dependentTask   Task           @relation("DependentTask", fields: [dependentTaskId], references: [id], onDelete: Cascade)
+
+  @@unique([dependentTaskId, blockingTaskId])
+  @@map("task_dependencies")
+}
+
+model Task {
+  id             String           @id
+  tenantId       String
+  title          String
+  description    String?
+  status         TaskStatus       @default(TODO)
+  priority       Priority         @default(MEDIUM)
+  projectId      String?
+  milestoneId    String?
+  parentTaskId   String?
+  assigneeId     String?
+  createdById    String
+  dueDate        DateTime?
+  startDate      DateTime?
+  completedAt    DateTime?
+  estimatedHours Decimal?         @db.Decimal(8, 2)
+  actualHours    Decimal?         @db.Decimal(8, 2)
+  order          Int              @default(0)
+  labels         String[]
+  contactId      String?
+  dealId         String?
+  ticketId       String?
+  customFields   Json?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  attachments    TaskAttachment[]
+  checklists     TaskChecklist[]
+  comments       TaskComment[]
+  blockingFor    TaskDependency[] @relation("BlockingTask")
+  dependsOn      TaskDependency[] @relation("DependentTask")
+  assignee       User?            @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdBy      User             @relation("TaskCreator", fields: [createdById], references: [id])
+  milestone      Milestone?       @relation(fields: [milestoneId], references: [id])
+  parentTask     Task?            @relation("SubTasks", fields: [parentTaskId], references: [id])
+  subTasks       Task[]           @relation("SubTasks")
+  project        Project?         @relation(fields: [projectId], references: [id])
+  timeEntries    TimeEntry[]
+
+  @@index([tenantId, assigneeId])
+  @@index([tenantId, dueDate])
+  @@index([tenantId])
+  @@index([tenantId, projectId])
+  @@index([tenantId, status])
+  @@map("tasks")
+}
+
+model tenant_email_configs {
+  id          String   @id
+  tenantId    String
+  domain      String
+  imapHost    String
+  imapPort    Int      @default(993)
+  imapSecure  Boolean  @default(true)
+  smtpHost    String
+  smtpPort    Int      @default(465)
+  smtpSecure  Boolean  @default(true)
+  requiresTls Boolean  @default(true)
+  authMethod  String   @default("PLAIN")
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+
+  @@unique([tenantId, domain])
+  @@index([tenantId])
+}
+
+model TimeEntry {
+  id          String   @id
+  tenantId    String
+  projectId   String?
+  taskId      String?
+  userId      String
+  description String?
+  hours       Decimal  @db.Decimal(8, 2)
+  date        DateTime
+  billable    Boolean  @default(true)
+  billed      Boolean  @default(false)
+  hourlyRate  Decimal? @db.Decimal(10, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  project     Project? @relation(fields: [projectId], references: [id])
+  task        Task?    @relation(fields: [taskId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([date])
+  @@index([projectId])
+  @@index([taskId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("time_entries")
+}
+
+model usage_events {
+  id                String              @id
+  tenantId          String
+  walletId          String
+  eventType         UsageEventType
+  channel           ChannelAccountType?
+  channelAccountId  String?
+  referenceType     String?
+  referenceId       String?
+  quantity          Int                 @default(1)
+  unitCost          Decimal             @db.Decimal(10, 6)
+  totalCost         Decimal             @db.Decimal(10, 6)
+  currency          String              @default("USD")
+  providerCost      Decimal?            @db.Decimal(10, 6)
+  providerCurrency  String?
+  providerInvoiceId String?
+  status            UsageEventStatus    @default(PENDING)
+  billedAt          DateTime?
+  metadata          Json?
+  createdAt         DateTime            @default(now())
+
+  @@index([createdAt])
+  @@index([eventType])
+  @@index([tenantId])
+  @@index([walletId])
+}
+
+model wallet_reconciliations {
+  id                 String                     @id
+  tenantId           String
+  walletId           String
+  periodStart        DateTime
+  periodEnd          DateTime
+  calculatedSpend    Decimal                    @db.Decimal(15, 2)
+  providerReported   Decimal?                   @db.Decimal(15, 2)
+  discrepancy        Decimal?                   @db.Decimal(15, 2)
+  breakdownByChannel Json?
+  breakdownByType    Json?
+  status             WalletReconciliationStatus @default(PENDING)
+  reconciledAt       DateTime?
+  notes              String?
+  createdAt          DateTime                   @default(now())
+
+  @@index([periodStart])
+  @@index([tenantId])
+  @@index([walletId])
+}
+
+model wallet_transactions {
+  id            String                @id
+  tenantId      String
+  walletId      String
+  type          WalletTransactionType
+  amount        Decimal               @db.Decimal(15, 2)
+  currency      String
+  balanceAfter  Decimal               @db.Decimal(15, 2)
+  referenceType String?
+  referenceId   String?
+  description   String?
+  createdAt     DateTime              @default(now())
+  wallets       wallets               @relation(fields: [walletId], references: [id])
+
+  @@index([createdAt])
+  @@index([tenantId])
+  @@index([walletId])
+}
+
+model wallets {
+  id                  String                @id
+  tenantId            String                @unique
+  balance             Decimal               @default(0) @db.Decimal(15, 2)
+  currency            String                @default("USD")
+  autoTopUpEnabled    Boolean               @default(false)
+  autoTopUpThreshold  Decimal?              @db.Decimal(15, 2)
+  autoTopUpAmount     Decimal?              @db.Decimal(15, 2)
+  dailySpendLimit     Decimal?              @db.Decimal(15, 2)
+  monthlySpendLimit   Decimal?              @db.Decimal(15, 2)
+  lowBalanceThreshold Decimal?              @db.Decimal(15, 2)
+  lowBalanceAlertSent Boolean               @default(false)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  spend_limits        spend_limits[]
+  wallet_transactions wallet_transactions[]
+  tenants             Tenant                @relation(fields: [tenantId], references: [id])
+}
+
+model webhook_deliveries {
+  id             String                @id
+  webhookId      String
+  event          String
+  requestPayload Json?
+  status         WebhookDeliveryStatus @default(PENDING)
+  statusCode     Int?
+  responseBody   String?
+  error          String?
+  duration       Int?
+  attempts       Int                   @default(0)
+  nextRetryAt    DateTime?
+  createdAt      DateTime              @default(now())
+  deliveredAt    DateTime?
+  webhooks       webhooks              @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([webhookId])
+}
+
+model webhooks {
+  id                 String               @id
+  tenantId           String
+  name               String
+  url                String
+  events             String[]
+  secret             String
+  headers            Json?
+  retryPolicy        Json?
+  status             WebhookStatus        @default(ACTIVE)
+  lastTriggeredAt    DateTime?
+  successCount       Int                  @default(0)
+  failureCount       Int                  @default(0)
+  createdById        String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime
+  webhook_deliveries webhook_deliveries[]
+  users              User                 @relation(fields: [createdById], references: [id])
+
+  @@index([tenantId])
+}
+
+model workflow_actions {
+  id         String    @id
+  workflowId String
+  type       String
+  config     Json
+  order      Int       @default(0)
+  workflows  workflows @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+}
+
+model workflow_conditions {
+  id            String    @id
+  workflowId    String
+  field         String
+  operator      String
+  value         Json
+  groupId       String?
+  groupOperator String?
+  order         Int       @default(0)
+  workflows     workflows @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+}
+
+model workflow_executions {
+  id               String                  @id
+  tenantId         String
+  workflowId       String
+  triggerEvent     String
+  triggerData      Json
+  status           WorkflowExecutionStatus @default(PENDING)
+  conditionResults Json?
+  actionResults    Json?
+  error            String?
+  startedAt        DateTime                @default(now())
+  completedAt      DateTime?
+  workflows        workflows               @relation(fields: [workflowId], references: [id])
+
+  @@index([startedAt])
+  @@index([tenantId])
+  @@index([workflowId])
+}
+
+model workflow_triggers {
+  id         String    @id
+  workflowId String
+  type       String
+  config     Json?
+  workflows  workflows @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId])
+}
+
+model workflows {
+  id                  String                @id
+  tenantId            String
+  name                String
+  description         String?
+  isActive            Boolean               @default(false)
+  isSandbox           Boolean               @default(false)
+  version             Int                   @default(1)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  createdById         String
+  workflow_actions    workflow_actions[]
+  workflow_conditions workflow_conditions[]
+  workflow_executions workflow_executions[]
+  workflow_triggers   workflow_triggers[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+enum TenantStatus {
+  ONBOARDING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum OnboardingStatus {
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+  FAILED
+}
+
+enum ChannelType {
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum CalendarEventType {
+  MEETING
+  CALL
+  TASK
+  REMINDER
+  DEADLINE
+  OTHER
+}
+
+enum CalendarEventStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum PipelineType {
+  DEAL
+  TICKET
+}
+
+enum ActivityType {
+  TASK
+  CALL
+  MEETING
+  NOTE
+  EMAIL
+  CONTACT_CREATED
+  CONTACT_UPDATED
+  CONTACT_MERGED
+  CONTACT_CONVERTED
+  WHATSAPP_SENT
+  WHATSAPP_RECEIVED
+  SMS_SENT
+  SMS_RECEIVED
+  STATUS_CHANGED
+  OWNER_CHANGED
+  STAGE_CHANGED
+  BROADCAST_SENT
+  BROADCAST_DELIVERED
+  BROADCAST_READ
+  BROADCAST_CLICKED
+  BROADCAST_REPLIED
+  BROADCAST_OPTED_OUT
+  SEQUENCE_ENROLLED
+  SEQUENCE_STEP_SENT
+  SEQUENCE_STEP_OPENED
+  SEQUENCE_STEP_CLICKED
+  SEQUENCE_COMPLETED
+  SEQUENCE_EXITED
+  SEQUENCE_PAUSED
+  SEQUENCE_RESUMED
+  MARKETING_EMAIL_SENT
+  MARKETING_EMAIL_OPENED
+  MARKETING_EMAIL_CLICKED
+  MARKETING_EMAIL_BOUNCED
+  MARKETING_EMAIL_UNSUBSCRIBED
+  SEGMENT_ADDED
+  SEGMENT_REMOVED
+  CAMPAIGN_ENROLLED
+  CAMPAIGN_CONVERTED
+  CAMPAIGN_COMPLETED
+  WEBSITE_VISIT
+  FORM_SUBMIT
+  PAGE_VIEW
+  LINK_CLICK
+}
+
+enum CallStatus {
+  INITIATED
+  RINGING
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+  BUSY
+  FAILED
+  CANCELLED
+  INITIATING
+  ON_HOLD
+  NO_ANSWER
+}
+
+enum ApiKeyStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum AssignToType {
+  USER
+  TEAM
+  ROUND_ROBIN
+  QUEUE
+}
+
+enum AssignmentTargetType {
+  USER
+  TEAM
+  ROUND_ROBIN
+  LEAST_BUSY
+}
+
+enum AudienceType {
+  ALL_CONTACTS
+  SEGMENT
+  SPECIFIC
+  CONTACTS
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum BroadcastChannel {
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum BroadcastRecipientStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  OPTED_OUT
+  INVALID
+}
+
+enum BroadcastStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  COMPLETED
+  CANCELLED
+  FAILED
+  QUEUED
+  PAUSED
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum CannedResponseVisibility {
+  PERSONAL
+  TEAM
+}
+
+enum ChannelAccountStatus {
+  PENDING
+  ACTIVE
+  DISCONNECTED
+  ERROR
+  SUSPENDED
+}
+
+enum ChannelAccountType {
+  WHATSAPP
+  SMS
+  VOICE
+  EMAIL_GMAIL
+  EMAIL_MICROSOFT
+  EMAIL_SMTP
+}
+
+enum ChannelConfigStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PENDING_VERIFICATION
+  PENDING_TEMPLATES
+  READY
+  ERROR
+  SUSPENDED
+}
+
+enum ChannelHealthStatus {
+  HEALTHY
+  DEGRADED
+  UNHEALTHY
+  UNKNOWN
+}
+
+enum ChannelStatus {
+  PENDING
+  ACTIVE
+  DISCONNECTED
+  ERROR
+}
+
+enum CompanyLifecycle {
+  LEAD
+  QUALIFIED
+  OPPORTUNITY
+  CUSTOMER
+  CHURNED
+  INACTIVE
+}
+
+enum CompanyType {
+  PROSPECT
+  CUSTOMER
+  PARTNER
+  VENDOR
+  COMPETITOR
+  OTHER
+}
+
+enum ConsentStatus {
+  PENDING
+  GRANTED
+  REVOKED
+  EXPIRED
+}
+
+enum ConsentType {
+  MARKETING
+  TRANSACTIONAL
+  WHATSAPP
+  SMS
+  VOICE
+  EMAIL
+}
+
+enum ContactSource {
+  WHATSAPP
+  SMS
+  EMAIL
+  MANUAL
+  IMPORT
+  WEBSITE
+  FORM
+  API
+  REFERRAL
+  SOCIAL
+  PHONE_CALL
+  CHAT_WIDGET
+  INTEGRATION
+  EVENT
+  PARTNER
+  ADVERTISEMENT
+  OTHER
+}
+
+enum ContactStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum ConversationThreadStatus {
+  OPEN
+  PENDING
+  SNOOZED
+  RESOLVED
+  CLOSED
+}
+
+// Purpose classification for inbox segmentation
+enum ConversationPurpose {
+  GENERAL    // Unclassified conversations
+  SALES      // Lead inquiries, quotes, negotiations
+  SUPPORT    // Issues, complaints, help requests
+  SERVICE    // Bookings, appointments, service requests
+  MARKETING  // Campaign responses, surveys, feedback
+}
+
+enum CustomFieldEntity {
+  CONTACT
+  COMPANY
+  DEAL
+}
+
+enum CustomFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  DATE
+  DATETIME
+  BOOLEAN
+  SELECT
+  MULTISELECT
+  EMAIL
+  PHONE
+  URL
+  CURRENCY
+}
+
+enum DLTStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum DependencyType {
+  FINISH_TO_START
+  START_TO_START
+  FINISH_TO_FINISH
+  START_TO_FINISH
+}
+
+enum EInvoiceStatus {
+  PENDING
+  GENERATED
+  CANCELLED
+  FAILED
+}
+
+enum EmailAccessPermission {
+  READ_ONLY
+  READ_REPLY
+  FULL_ACCESS
+}
+
+enum EmailAccountStatus {
+  ACTIVE
+  DISCONNECTED
+  TOKEN_EXPIRED
+  SYNC_ERROR
+  DISABLED
+}
+
+enum EmailProvider {
+  GMAIL
+  GOOGLE_WORKSPACE
+  OUTLOOK
+  OFFICE365
+  YAHOO
+  ZOHO
+  ICLOUD
+  IMAP
+  OTHER
+}
+
+enum EscalationTrigger {
+  BEFORE_FIRST_RESPONSE_BREACH
+  AFTER_FIRST_RESPONSE_BREACH
+  BEFORE_RESOLUTION_BREACH
+  AFTER_RESOLUTION_BREACH
+}
+
+enum GstInvoiceType {
+  TAX_INVOICE
+  BILL_OF_SUPPLY
+  CREDIT_NOTE
+  DEBIT_NOTE
+  EXPORT_INVOICE
+  SEZ_INVOICE
+  RECEIPT_VOUCHER
+  REFUND_VOUCHER
+  PAYMENT_VOUCHER
+}
+
+enum IntegrationStatus {
+  PENDING
+  CONNECTED
+  DISCONNECTED
+  ERROR
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum LeadPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum LeadRating {
+  HOT
+  WARM
+  COLD
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  UNQUALIFIED
+  CONVERTED
+}
+
+enum LeadStatusType {
+  NEW
+  OPEN
+  IN_PROGRESS
+  OPEN_DEAL
+  UNQUALIFIED
+  ATTEMPTED_TO_CONTACT
+  CONNECTED
+  BAD_TIMING
+}
+
+enum LifecycleStage {
+  SUBSCRIBER
+  LEAD
+  MQL
+  SQL
+  OPPORTUNITY
+  CUSTOMER
+  EVANGELIST
+  OTHER
+}
+
+enum MarketingCampaignStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum MarketingCampaignType {
+  BROADCAST
+  DRIP
+  NURTURE
+  PROMOTIONAL
+  ONBOARDING
+  REENGAGEMENT
+  EVENT
+  CUSTOM
+}
+
+enum MessageContentType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  LOCATION
+  CONTACT
+  TEMPLATE
+  INTERACTIVE
+  EMAIL
+  SYSTEM
+}
+
+enum MessageEventStatus {
+  PENDING
+  QUEUED
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELLED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  MISSED
+}
+
+enum Module {
+  CRM
+  INBOX
+  PIPELINE
+  AUTOMATION
+  ANALYTICS
+  PROJECTS
+  DIALER
+  BROADCASTS
+}
+
+enum PaymentMethod {
+  CARD
+  BANK_TRANSFER
+  UPI
+  WALLET
+  CASH
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProductType {
+  GOODS
+  SERVICES
+}
+
+enum ProjectMemberRole {
+  OWNER
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+enum ProjectStatus {
+  PLANNING
+  NOT_STARTED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  CONVERTED
+}
+
+enum SLAStatus {
+  ON_TRACK
+  AT_RISK
+  BREACHED
+}
+
+enum SegmentType {
+  STATIC
+  DYNAMIC
+}
+
+enum SequenceEnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  EXITED
+  BOUNCED
+}
+
+enum SequenceStepRunStatus {
+  PENDING
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+  CANCELLED
+}
+
+enum SequenceStepType {
+  WHATSAPP
+  SMS
+  EMAIL
+  TASK
+  CALL
+  WAIT
+  CONDITION
+}
+
+enum SequenceTarget {
+  CONTACT
+  LEAD
+  DEAL
+}
+
+enum SignatureChannel {
+  ALL
+  EMAIL
+  WHATSAPP
+}
+
+enum SpendLimitType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum SuperAdminRole {
+  SUPER_ADMIN
+  ADMIN
+  SUPPORT
+  BILLING
+  ANALYST
+}
+
+enum SupplyType {
+  B2B
+  B2C_LARGE
+  B2C_SMALL
+  SEZ_WITH_PAY
+  SEZ_WITHOUT_PAY
+  EXPORT_WITH_PAY
+  EXPORT_WITHOUT_PAY
+  DEEMED_EXPORT
+  NIL_RATED
+  EXEMPT
+}
+
+enum SyncStatus {
+  IDLE
+  SYNCING
+  SUCCESS
+  FAILED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum TeamRole {
+  LEADER
+  MEMBER
+}
+
+enum TemplateCategory {
+  UTILITY
+  MARKETING
+  AUTHENTICATION
+  FEEDBACK
+}
+
+enum TemplateHeaderType {
+  TEXT
+  IMAGE
+  VIDEO
+  DOCUMENT
+}
+
+enum TemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TransportMode {
+  ROAD
+  RAIL
+  AIR
+  SHIP
+  IN_TRANSIT
+}
+
+enum UsageEventStatus {
+  PENDING
+  BILLED
+  FAILED
+  REFUNDED
+}
+
+enum UsageEventType {
+  WHATSAPP_SESSION
+  WHATSAPP_TEMPLATE_UTILITY
+  WHATSAPP_TEMPLATE_MARKETING
+  WHATSAPP_TEMPLATE_AUTH
+  SMS_SEND
+  SMS_RECEIVE
+  VOICE_OUTBOUND
+  VOICE_INBOUND
+  VOICE_RECORDING
+  EMAIL_SEND
+  EMAIL_RECEIVE
+}
+
+enum WalletReconciliationStatus {
+  PENDING
+  IN_PROGRESS
+  RECONCILED
+  DISCREPANCY_FOUND
+  RESOLVED
+}
+
+enum WalletTransactionType {
+  CREDIT
+  DEBIT
+  REFUND
+  ADJUSTMENT
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  CANCELLED
+}
+
+enum WebhookStatus {
+  ACTIVE
+  PAUSED
+  DISABLED
+}
+
+enum WhatsAppSetupMode {
+  SELF_SERVICE
+  MANAGED
+  BYOK
+}
+
+enum WorkflowExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WorkspaceStatus {
+  ACTIVE
+  ARCHIVED
+}

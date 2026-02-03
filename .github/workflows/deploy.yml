@@ -1,0 +1,45 @@
+name: Deploy API to VPS
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@dc588b651fe13675774614f8e6a936a468676387 # v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Add VPS to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H 147.79.71.176 >> ~/.ssh/known_hosts
+
+      - name: Deploy to VPS
+        run: |
+          rsync -avz --delete \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            --exclude '.env.local' \
+            --exclude '.git' \
+            -e ssh \
+            . root@147.79.71.176:/var/www/nexora-api/
+
+          ssh root@147.79.71.176 << 'EOF'
+            cd /var/www/nexora-api
+            npm install
+            cd packages/database && npm install && npx prisma generate && cd ../..
+            pm2 restart nexora-api
+          EOF
+
+      - name: Health check
+        run: |
+          sleep 5
+          curl -f https://api.nexoraos.pro/health || exit 1

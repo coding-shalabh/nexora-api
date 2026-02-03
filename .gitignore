@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.local
+*.log
+coverage/
+nul
+
+# Temporary files
+tmpclaude-*
+**/tmpclaude-*
+
+# Railway credentials
+docs/RAILWAY_ACCESS.md
+**/RAILWAY_ACCESS.md

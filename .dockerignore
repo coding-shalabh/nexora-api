@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+
+# Logs
+*.log
+
+# Test files
+coverage
+**/__tests__
+**/*.test.js
+**/*.spec.js
+
+# Misc
+*.md
+.turbo
+nul

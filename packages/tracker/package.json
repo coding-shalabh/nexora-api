@@ -1,0 +1,29 @@
+{
+  "name": "@crm360/tracker",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CRM360 Website Visitor Tracking SDK",
+  "main": "dist/tracker.js",
+  "module": "dist/tracker.esm.js",
+  "types": "dist/tracker.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.5",
+    "rollup": "^4.9.1",
+    "typescript": "^5.3.3",
+    "rimraf": "^5.0.5"
+  },
+  "dependencies": {
+    "rrweb": "^2.0.0-alpha.11"
+  }
+}

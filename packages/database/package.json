@@ -1,0 +1,30 @@
+{
+  "name": "@crm360/database",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Database schema and Prisma client",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./src/client.js"
+  },
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:push": "prisma db push",
+    "prisma:studio": "prisma studio",
+    "prisma:format": "prisma format",
+    "seed": "node prisma/seed.js",
+    "seed:minimal": "node prisma/seed-minimal.js",
+    "seed:fresh": "prisma db push --force-reset && node prisma/seed-minimal.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.8.0",
+    "bcryptjs": "^2.4.3"
+  },
+  "devDependencies": {
+    "prisma": "^5.8.0"
+  }
+}
