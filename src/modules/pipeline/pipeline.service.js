@@ -360,6 +360,7 @@ class PipelineService {
         contactId: data.contactId,
         companyId: data.companyId,
         amount: data.value,
+        currency: data.currency || 'USD',
         expectedCloseDate: data.expectedCloseDate ? new Date(data.expectedCloseDate) : undefined,
         ownerId: userId,
       },

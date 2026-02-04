@@ -121,6 +121,7 @@ router.post('/deals', requirePermission('pipeline:deals:create'), async (req, re
         contactId: z.string().cuid().optional(),
         companyId: z.string().cuid().optional(),
         value: z.number().min(0).optional().nullable(),
+        currency: z.string().default('USD').optional(),
         probability: z.number().min(0).max(100).optional().nullable(),
         expectedCloseDate: z.string().datetime().optional().nullable(),
         description: z.string().optional().nullable(),
