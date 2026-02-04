@@ -263,7 +263,7 @@ model UserInvite {
   expiresAt   DateTime
   acceptedAt  DateTime?
   createdAt   DateTime     @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
 
   @@unique([tenantId, email])
   @@index([status])
@@ -935,7 +935,7 @@ model ConversationThread {
   lastMessageChannel    ChannelAccountType?
   customFields          Json?
   createdAt             DateTime                 @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime @updatedAt
   closedAt              DateTime?
   isStarred             Boolean                  @default(false)
   assignedToTeamId      String?
@@ -1547,7 +1547,7 @@ model LinkClick {
 }
 
 model api_keys {
-  id         String       @id
+  id         String       @id @default(cuid())
   tenantId   String
   userId     String
   name       String
@@ -1566,7 +1566,7 @@ model api_keys {
 }
 
 model audit_logs {
-  id         String   @id
+  id         String   @id @default(cuid())
   tenantId   String
   userId     String?
   action     String
@@ -1587,7 +1587,7 @@ model audit_logs {
 }
 
 model broadcast_recipients {
-  id            String                   @id
+  id            String                   @id @default(cuid())
   broadcastId   String
   contactId     String?
   phone         String?
@@ -1605,7 +1605,7 @@ model broadcast_recipients {
   repliedAt     DateTime?
   optedOutAt    DateTime?
   createdAt     DateTime                 @default(now())
-  updatedAt     DateTime
+  updatedAt     DateTime @updatedAt
   broadcasts    broadcasts               @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
 
   @@index([broadcastId])
@@ -1615,7 +1615,7 @@ model broadcast_recipients {
 }
 
 model broadcasts {
-  id                   String                 @id
+  id                   String                 @id @default(cuid())
   tenantId             String
   name                 String
   description          String?
@@ -1634,7 +1634,7 @@ model broadcasts {
   failedCount          Int                    @default(0)
   createdById          String
   createdAt            DateTime               @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime @updatedAt
   actualCost           Decimal?               @db.Decimal(10, 2)
   audienceFilter       Json?
   audienceType         AudienceType           @default(CONTACTS)
@@ -1661,7 +1661,7 @@ model broadcasts {
 }
 
 model chatbots {
-  id                 String      @id
+  id                 String      @id @default(cuid())
   tenantId           String
   name               String
   description        String?
@@ -1677,14 +1677,14 @@ model chatbots {
   handoffRate        Decimal?    @db.Decimal(5, 2)
   createdById        String
   createdAt          DateTime    @default(now())
-  updatedAt          DateTime
+  updatedAt          DateTime @updatedAt
 
   @@unique([tenantId, name])
   @@index([tenantId])
 }
 
 model consents {
-  id        String             @id
+  id        String             @id @default(cuid())
   tenantId  String
   contactId String
   channel   ChannelAccountType
@@ -1700,7 +1700,7 @@ model consents {
   source    String?
   metadata  Json?
   createdAt DateTime           @default(now())
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
 
   @@index([contactId])
   @@index([tenantId, channel])
@@ -1708,7 +1708,7 @@ model consents {
 }
 
 model conversation_notes {
-  id                   String             @id
+  id                   String             @id @default(cuid())
   tenantId             String
   threadId             String
   userId               String
@@ -1716,7 +1716,7 @@ model conversation_notes {
   isPinned             Boolean            @default(false)
   mentions             String[]
   createdAt            DateTime           @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime @updatedAt
   conversation_threads ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
@@ -1724,7 +1724,7 @@ model conversation_notes {
 }
 
 model conversation_tags {
-  id             String       @id
+  id             String       @id @default(cuid())
   conversationId String
   tagId          String
   createdAt      DateTime     @default(now())
@@ -1735,7 +1735,7 @@ model conversation_tags {
 }
 
 model custom_fields {
-  id           String            @id
+  id           String            @id @default(cuid())
   tenantId     String
   entityType   CustomFieldEntity
   name         String
@@ -1750,14 +1750,14 @@ model custom_fields {
   sortOrder    Int               @default(0)
   createdById  String
   createdAt    DateTime          @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime @updatedAt
 
   @@unique([tenantId, entityType, apiName])
   @@index([tenantId, entityType])
 }
 
 model DealProduct {
-  id        String   @id
+  id        String   @id @default(cuid())
   dealId    String
   productId String
   quantity  Int      @default(1)
@@ -1772,7 +1772,7 @@ model DealProduct {
 }
 
 model email_account_access {
-  id             String                @id
+  id             String                @id @default(cuid())
   emailAccountId String
   userId         String?
   teamId         String?
@@ -1789,7 +1789,7 @@ model email_account_access {
 }
 
 model email_provider_configs {
-  id                  String        @id
+  id                  String        @id @default(cuid())
   domain              String        @unique
   provider            EmailProvider
   name                String
@@ -1809,11 +1809,11 @@ model email_provider_configs {
   helpUrl             String?
   isActive            Boolean       @default(true)
   createdAt           DateTime      @default(now())
-  updatedAt           DateTime
+  updatedAt           DateTime @updatedAt
 }
 
 model email_signatures {
-  id               String         @id
+  id               String         @id @default(cuid())
   tenantId         String
   channelAccountId String
   name             String
@@ -1821,7 +1821,7 @@ model email_signatures {
   textContent      String?
   isDefault        Boolean        @default(false)
   createdAt        DateTime       @default(now())
-  updatedAt        DateTime
+  updatedAt        DateTime @updatedAt
   channel_accounts ChannelAccount @relation(fields: [channelAccountId], references: [id])
 
   @@unique([tenantId, channelAccountId, name])
@@ -1829,7 +1829,7 @@ model email_signatures {
 }
 
 model email_verification_tokens {
-  id        String    @id
+  id        String    @id @default(cuid())
   token     String    @unique
   userId    String
   email     String
@@ -1843,7 +1843,7 @@ model email_verification_tokens {
 }
 
 model EscalationRule {
-  id             String            @id
+  id             String            @id @default(cuid())
   tenantId       String
   slaPolicyId    String
   name           String
@@ -1860,7 +1860,7 @@ model EscalationRule {
 }
 
 model InboxSLAPolicy {
-  id                  String   @id
+  id                  String   @id @default(cuid())
   tenantId            String
   name                String
   description         String?
@@ -1876,7 +1876,7 @@ model InboxSLAPolicy {
   escalationEnabled   Boolean  @default(false)
   escalationConfig    Json?
   createdAt           DateTime @default(now())
-  updatedAt           DateTime
+  updatedAt           DateTime @updatedAt
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -1884,7 +1884,7 @@ model InboxSLAPolicy {
 }
 
 model integrations {
-  id             String            @id
+  id             String            @id @default(cuid())
   tenantId       String
   name           String
   type           String
@@ -1898,7 +1898,7 @@ model integrations {
   connectedById  String
   disconnectedAt DateTime?
   createdAt      DateTime          @default(now())
-  updatedAt      DateTime
+  updatedAt      DateTime @updatedAt
   isValidated    Boolean           @default(false)
   lastTestedAt   DateTime?
   testResult     String?
@@ -1910,7 +1910,7 @@ model integrations {
 }
 
 model InvoiceLine {
-  id              String      @id
+  id              String      @id @default(cuid())
   invoiceId       String
   productId       String?
   description     String
@@ -1945,7 +1945,7 @@ model InvoiceLine {
 }
 
 model Invoice {
-  id                   String          @id
+  id                   String          @id @default(cuid())
   tenantId             String
   invoiceNumber        String
   contactId            String?
@@ -1968,7 +1968,7 @@ model Invoice {
   pdfUrl               String?
   createdById          String
   createdAt            DateTime        @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime @updatedAt
   isGstInvoice         Boolean         @default(false)
   invoiceType          GstInvoiceType  @default(TAX_INVOICE)
   supplyType           SupplyType      @default(B2B)
@@ -2038,7 +2038,7 @@ model Invoice {
 }
 
 model Lead {
-  id                     String        @id
+  id                     String        @id @default(cuid())
   tenantId               String
   firstName              String?
   lastName               String?
@@ -2095,7 +2095,7 @@ model Lead {
   twitterUrl             String?
   customFields           Json?
   createdAt              DateTime      @default(now())
-  updatedAt              DateTime
+  updatedAt              DateTime @updatedAt
   callSessions           CallSession[]
   convertedToContact     Contact?      @relation(fields: [convertedToContactId], references: [id])
   convertedToDeal        Deal?         @relation(fields: [convertedToDealId], references: [id])
@@ -2111,7 +2111,7 @@ model Lead {
 }
 
 model marketing_campaigns {
-  id                String                  @id
+  id                String                  @id @default(cuid())
   tenantId          String
   name              String
   description       String?
@@ -2139,7 +2139,7 @@ model marketing_campaigns {
   metadata          Json?
   createdById       String
   createdAt         DateTime                @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime @updatedAt
   activities        Activity[]
   broadcasts        broadcasts[]
   sequences         sequences[]
@@ -2152,7 +2152,7 @@ model marketing_campaigns {
 }
 
 model message_events {
-  id                   String             @id
+  id                   String             @id @default(cuid())
   tenantId             String
   threadId             String
   channelAccountId     String
@@ -2194,7 +2194,7 @@ model message_events {
   usageEventId         String?
   metadata             Json?
   createdAt            DateTime           @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime @updatedAt
   channel_accounts     ChannelAccount     @relation(fields: [channelAccountId], references: [id])
   conversation_threads ConversationThread @relation(fields: [threadId], references: [id])
 
@@ -2208,7 +2208,7 @@ model message_events {
 }
 
 model Milestone {
-  id          String          @id
+  id          String          @id @default(cuid())
   tenantId    String
   projectId   String
   name        String
@@ -2217,7 +2217,7 @@ model Milestone {
   status      MilestoneStatus @default(PENDING)
   order       Int             @default(0)
   createdAt   DateTime        @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
   completedAt DateTime?
   project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   tasks       Task[]
@@ -2229,7 +2229,7 @@ model Milestone {
 }
 
 model onboarding_progress {
-  id                   String    @id
+  id                   String    @id @default(cuid())
   tenantId             String    @unique
   currentStep          Int       @default(1)
   totalSteps           Int       @default(6)
@@ -2244,12 +2244,12 @@ model onboarding_progress {
   startedAt            DateTime  @default(now())
   lastActivityAt       DateTime  @default(now())
   createdAt            DateTime  @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime @updatedAt
   tenants              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 }
 
 model onboarding_steps {
-  id          String   @id
+  id          String   @id @default(cuid())
   order       Int      @unique
   name        String   @unique
   title       String
@@ -2258,11 +2258,11 @@ model onboarding_steps {
   isSkippable Boolean  @default(false)
   icon        String?
   createdAt   DateTime @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
 }
 
 model opt_outs {
-  id         String             @id
+  id         String             @id @default(cuid())
   tenantId   String
   identifier String
   channel    ChannelAccountType
@@ -2277,7 +2277,7 @@ model opt_outs {
 }
 
 model password_reset_tokens {
-  id        String    @id
+  id        String    @id @default(cuid())
   token     String    @unique
   userId    String
   expiresAt DateTime
@@ -2290,7 +2290,7 @@ model password_reset_tokens {
 }
 
 model Payment {
-  id                String        @id
+  id                String        @id @default(cuid())
   tenantId          String
   invoiceId         String
   amount            Decimal       @db.Decimal(15, 2)
@@ -2309,7 +2309,7 @@ model Payment {
 }
 
 model platform_audit_logs {
-  id           String      @id
+  id           String      @id @default(cuid())
   superAdminId String?
   action       String
   entityType   String?
@@ -2327,7 +2327,7 @@ model platform_audit_logs {
 }
 
 model Product {
-  id              String         @id
+  id              String         @id @default(cuid())
   tenantId        String
   name            String
   description     String?
@@ -2337,7 +2337,7 @@ model Product {
   taxRate         Decimal?       @db.Decimal(5, 2)
   isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime       @updatedAt
   hsnCode         String?
   sacCode         String?
   productType     ProductType    @default(GOODS)
@@ -2356,7 +2356,7 @@ model Product {
 }
 
 model ProjectMember {
-  id        String            @id
+  id        String            @id @default(cuid())
   projectId String
   userId    String
   role      ProjectMemberRole @default(MEMBER)
@@ -2368,7 +2368,7 @@ model ProjectMember {
 }
 
 model Project {
-  id              String          @id
+  id              String          @id @default(cuid())
   tenantId        String
   name            String
   description     String?
@@ -2387,7 +2387,7 @@ model Project {
   color           String          @default("#6366f1")
   customFields    Json?
   createdAt       DateTime        @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime @updatedAt
   completedAt     DateTime?
   milestones      Milestone[]
   members         ProjectMember[]
@@ -2402,7 +2402,7 @@ model Project {
 }
 
 model QuoteLine {
-  id              String      @id
+  id              String      @id @default(cuid())
   quoteId         String
   productId       String?
   description     String
@@ -2437,7 +2437,7 @@ model QuoteLine {
 }
 
 model Quote {
-  id              String       @id
+  id              String       @id @default(cuid())
   tenantId        String
   quoteNumber     String
   contactId       String?
@@ -2456,7 +2456,7 @@ model Quote {
   pdfUrl          String?
   createdById     String
   createdAt       DateTime     @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime @updatedAt
   isGstQuote      Boolean      @default(false)
   supplyType      SupplyType   @default(B2B)
   sellerGstin     String?
@@ -2489,7 +2489,7 @@ model Quote {
 }
 
 model rate_limit_states {
-  id           String    @id
+  id           String    @id @default(cuid())
   tenantId     String
   resourceType String
   resourceId   String
@@ -2499,14 +2499,14 @@ model rate_limit_states {
   maxRequests  Int
   isBlocked    Boolean   @default(false)
   blockedUntil DateTime?
-  updatedAt    DateTime
+  updatedAt    DateTime @updatedAt
 
   @@unique([tenantId, resourceType, resourceId, windowStart])
   @@index([tenantId])
 }
 
 model routing_rules {
-  id           String       @id
+  id           String       @id @default(cuid())
   tenantId     String
   name         String
   description  String?
@@ -2516,13 +2516,13 @@ model routing_rules {
   assignToId   String?
   isActive     Boolean      @default(true)
   createdAt    DateTime     @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime @updatedAt
 
   @@index([tenantId])
 }
 
 model segments {
-  id           String      @id
+  id           String      @id @default(cuid())
   tenantId     String
   name         String
   description  String?
@@ -2533,7 +2533,7 @@ model segments {
   isActive     Boolean     @default(true)
   createdById  String
   createdAt    DateTime    @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime @updatedAt
   lastSyncAt   DateTime?
 
   @@unique([tenantId, name])
@@ -2541,7 +2541,7 @@ model segments {
 }
 
 model sequence_enrollments {
-  id                 String                   @id
+  id                 String                   @id @default(cuid())
   tenantId           String
   sequenceId         String
   contactId          String?
@@ -2571,7 +2571,7 @@ model sequence_enrollments {
 }
 
 model sequence_step_runs {
-  id                   String                @id
+  id                   String                @id @default(cuid())
   tenantId             String
   enrollmentId         String
   stepId               String
@@ -2593,7 +2593,7 @@ model sequence_step_runs {
 }
 
 model sequence_steps {
-  id                 String               @id
+  id                 String               @id @default(cuid())
   sequenceId         String
   order              Int
   stepType           SequenceStepType
@@ -2609,7 +2609,7 @@ model sequence_steps {
   isABTest           Boolean              @default(false)
   variants           Json?
   createdAt          DateTime             @default(now())
-  updatedAt          DateTime
+  updatedAt          DateTime @updatedAt
   sequence_step_runs sequence_step_runs[]
   sequences          sequences            @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
 
@@ -2618,7 +2618,7 @@ model sequence_steps {
 }
 
 model sequences {
-  id                   String                 @id
+  id                   String                 @id @default(cuid())
   tenantId             String
   name                 String
   description          String?
@@ -2632,7 +2632,7 @@ model sequences {
   isActive             Boolean                @default(false)
   createdById          String
   createdAt            DateTime               @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime @updatedAt
   campaignId           String?
   activities           Activity[]
   sequence_enrollments sequence_enrollments[]
@@ -2645,7 +2645,7 @@ model sequences {
 }
 
 model shared_inbox_members {
-  id                   String         @id
+  id                   String         @id @default(cuid())
   sharedInboxId        String
   userId               String
   role                 String         @default("member")
@@ -2659,7 +2659,7 @@ model shared_inbox_members {
 }
 
 model shared_inboxes {
-  id                   String                 @id
+  id                   String                 @id @default(cuid())
   tenantId             String
   name                 String
   email                String
@@ -2684,7 +2684,7 @@ model shared_inboxes {
   lastSyncAt           DateTime?
   lastSyncError        String?
   createdAt            DateTime               @default(now())
-  updatedAt            DateTime
+  updatedAt            DateTime @updatedAt
   shared_inbox_members shared_inbox_members[]
 
   @@unique([tenantId, email])
@@ -2692,7 +2692,7 @@ model shared_inboxes {
 }
 
 model SLAPolicy {
-  id                String            @id
+  id                String            @id @default(cuid())
   tenantId          String
   name              String
   description       String?
@@ -2702,7 +2702,7 @@ model SLAPolicy {
   isDefault         Boolean           @default(false)
   isActive          Boolean           @default(true)
   createdAt         DateTime          @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime @updatedAt
   escalationRules   EscalationRule[]
   tickets           Ticket[]
 
@@ -2712,7 +2712,7 @@ model SLAPolicy {
 }
 
 model sms_templates {
-  id                 String         @id
+  id                 String         @id @default(cuid())
   tenantId           String
   channelAccountId   String
   name               String
@@ -2726,7 +2726,7 @@ model sms_templates {
   deliveredCount     Int            @default(0)
   isActive           Boolean        @default(true)
   createdAt          DateTime       @default(now())
-  updatedAt          DateTime
+  updatedAt          DateTime @updatedAt
   channel_accounts   ChannelAccount @relation(fields: [channelAccountId], references: [id])
 
   @@unique([tenantId, channelAccountId, name])
@@ -2734,7 +2734,7 @@ model sms_templates {
 }
 
 model spend_limits {
-  id           String         @id
+  id           String         @id @default(cuid())
   tenantId     String
   walletId     String
   type         SpendLimitType
@@ -2744,7 +2744,7 @@ model spend_limits {
   periodEnd    DateTime
   hardLimit    Boolean        @default(false)
   createdAt    DateTime       @default(now())
-  updatedAt    DateTime
+  updatedAt    DateTime @updatedAt
   wallets      wallets        @relation(fields: [walletId], references: [id])
 
   @@index([tenantId])
@@ -2752,7 +2752,7 @@ model spend_limits {
 }
 
 model TaskAttachment {
-  id           String   @id
+  id           String   @id @default(cuid())
   taskId       String
   name         String
   url          String
@@ -2767,13 +2767,13 @@ model TaskAttachment {
 }
 
 model TaskChecklist {
-  id        String   @id
+  id        String   @id @default(cuid())
   taskId    String
   title     String
   isChecked Boolean  @default(false)
   order     Int      @default(0)
   createdAt DateTime @default(now())
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
@@ -2781,13 +2781,13 @@ model TaskChecklist {
 }
 
 model TaskComment {
-  id        String   @id
+  id        String   @id @default(cuid())
   tenantId  String
   taskId    String
   userId    String
   content   String
   createdAt DateTime @default(now())
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id])
 
@@ -2797,7 +2797,7 @@ model TaskComment {
 }
 
 model TaskDependency {
-  id              String         @id
+  id              String         @id @default(cuid())
   dependentTaskId String
   blockingTaskId  String
   type            DependencyType @default(FINISH_TO_START)
@@ -2810,7 +2810,7 @@ model TaskDependency {
 }
 
 model Task {
-  id             String           @id
+  id             String           @id @default(cuid())
   tenantId       String
   title          String
   description    String?
@@ -2833,7 +2833,7 @@ model Task {
   ticketId       String?
   customFields   Json?
   createdAt      DateTime         @default(now())
-  updatedAt      DateTime
+  updatedAt      DateTime         @updatedAt
   attachments    TaskAttachment[]
   checklists     TaskChecklist[]
   comments       TaskComment[]
@@ -2856,7 +2856,7 @@ model Task {
 }
 
 model tenant_email_configs {
-  id          String   @id
+  id          String   @id @default(cuid())
   tenantId    String
   domain      String
   imapHost    String
@@ -2870,14 +2870,14 @@ model tenant_email_configs {
   notes       String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
 
   @@unique([tenantId, domain])
   @@index([tenantId])
 }
 
 model TimeEntry {
-  id          String   @id
+  id          String   @id @default(cuid())
   tenantId    String
   projectId   String?
   taskId      String?
@@ -2889,7 +2889,7 @@ model TimeEntry {
   billed      Boolean  @default(false)
   hourlyRate  Decimal? @db.Decimal(10, 2)
   createdAt   DateTime @default(now())
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
   project     Project? @relation(fields: [projectId], references: [id])
   task        Task?    @relation(fields: [taskId], references: [id])
   user        User     @relation(fields: [userId], references: [id])
@@ -2903,7 +2903,7 @@ model TimeEntry {
 }
 
 model usage_events {
-  id                String              @id
+  id                String              @id @default(cuid())
   tenantId          String
   walletId          String
   eventType         UsageEventType
@@ -2930,7 +2930,7 @@ model usage_events {
 }
 
 model wallet_reconciliations {
-  id                 String                     @id
+  id                 String                     @id @default(cuid())
   tenantId           String
   walletId           String
   periodStart        DateTime
@@ -2951,7 +2951,7 @@ model wallet_reconciliations {
 }
 
 model wallet_transactions {
-  id            String                @id
+  id            String                @id @default(cuid())
   tenantId      String
   walletId      String
   type          WalletTransactionType
@@ -2970,7 +2970,7 @@ model wallet_transactions {
 }
 
 model wallets {
-  id                  String                @id
+  id                  String                @id @default(cuid())
   tenantId            String                @unique
   balance             Decimal               @default(0) @db.Decimal(15, 2)
   currency            String                @default("USD")
@@ -2982,14 +2982,14 @@ model wallets {
   lowBalanceThreshold Decimal?              @db.Decimal(15, 2)
   lowBalanceAlertSent Boolean               @default(false)
   createdAt           DateTime              @default(now())
-  updatedAt           DateTime
+  updatedAt           DateTime @updatedAt
   spend_limits        spend_limits[]
   wallet_transactions wallet_transactions[]
   tenants             Tenant                @relation(fields: [tenantId], references: [id])
 }
 
 model webhook_deliveries {
-  id             String                @id
+  id             String                @id @default(cuid())
   webhookId      String
   event          String
   requestPayload Json?
@@ -3009,7 +3009,7 @@ model webhook_deliveries {
 }
 
 model webhooks {
-  id                 String               @id
+  id                 String               @id @default(cuid())
   tenantId           String
   name               String
   url                String
@@ -3023,7 +3023,7 @@ model webhooks {
   failureCount       Int                  @default(0)
   createdById        String
   createdAt          DateTime             @default(now())
-  updatedAt          DateTime
+  updatedAt          DateTime @updatedAt
   webhook_deliveries webhook_deliveries[]
   users              User                 @relation(fields: [createdById], references: [id])
 
@@ -3031,7 +3031,7 @@ model webhooks {
 }
 
 model workflow_actions {
-  id         String    @id
+  id         String    @id @default(cuid())
   workflowId String
   type       String
   config     Json
@@ -3042,7 +3042,7 @@ model workflow_actions {
 }
 
 model workflow_conditions {
-  id            String    @id
+  id            String    @id @default(cuid())
   workflowId    String
   field         String
   operator      String
@@ -3056,7 +3056,7 @@ model workflow_conditions {
 }
 
 model workflow_executions {
-  id               String                  @id
+  id               String                  @id @default(cuid())
   tenantId         String
   workflowId       String
   triggerEvent     String
@@ -3075,7 +3075,7 @@ model workflow_executions {
 }
 
 model workflow_triggers {
-  id         String    @id
+  id         String    @id @default(cuid())
   workflowId String
   type       String
   config     Json?
@@ -3085,7 +3085,7 @@ model workflow_triggers {
 }
 
 model workflows {
-  id                  String                @id
+  id                  String                @id @default(cuid())
   tenantId            String
   name                String
   description         String?
@@ -3093,7 +3093,7 @@ model workflows {
   isSandbox           Boolean               @default(false)
   version             Int                   @default(1)
   createdAt           DateTime              @default(now())
-  updatedAt           DateTime
+  updatedAt           DateTime @updatedAt
   createdById         String
   workflow_actions    workflow_actions[]
   workflow_conditions workflow_conditions[]
