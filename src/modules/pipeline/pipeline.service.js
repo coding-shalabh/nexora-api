@@ -396,12 +396,14 @@ class PipelineService {
     const updated = await prisma.deal.update({
       where: { id: dealId },
       data: {
-        stageId,
-        probability: stage.probability,
+        stage: {
+          connect: { id: stageId },
+        },
+        stageChangedAt: new Date(),
         updatedAt: new Date(),
       },
       include: {
-        stage: { select: { id: true, name: true } },
+        stage: { select: { id: true, name: true, probability: true } },
       },
     });
 
@@ -441,9 +443,13 @@ class PipelineService {
     const updated = await prisma.deal.update({
       where: { id: dealId },
       data: {
-        stageId: wonStage.id,
+        stage: {
+          connect: { id: wonStage.id },
+        },
         closedAt: new Date(),
-        probability: 100,
+        wonReason: 'Deal won',
+        stageChangedAt: new Date(),
+        updatedAt: new Date(),
       },
     });
 
@@ -477,10 +483,13 @@ class PipelineService {
     const updated = await prisma.deal.update({
       where: { id: dealId },
       data: {
-        stageId: lostStage.id,
+        stage: {
+          connect: { id: lostStage.id },
+        },
         closedAt: new Date(),
-        probability: 0,
-        notes: reason ? `Lost reason: ${reason}` : undefined,
+        lostReason: reason,
+        stageChangedAt: new Date(),
+        updatedAt: new Date(),
       },
     });
 
