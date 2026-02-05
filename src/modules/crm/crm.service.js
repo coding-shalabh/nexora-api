@@ -1671,8 +1671,8 @@ class CrmService {
       where: { id: leadId, tenantId },
       include: {
         owner: { select: { id: true, firstName: true, lastName: true, email: true } },
-        convertedContact: { select: { id: true, firstName: true, lastName: true, email: true } },
-        convertedDeal: { select: { id: true, name: true, amount: true } },
+        convertedToContact: { select: { id: true, firstName: true, lastName: true, email: true } },
+        convertedToDeal: { select: { id: true, name: true, amount: true } },
       },
     });
 
@@ -1886,8 +1886,8 @@ class CrmService {
       },
       include: {
         owner: { select: { id: true, firstName: true, lastName: true } },
-        convertedContact: { select: { id: true, firstName: true, lastName: true } },
-        convertedDeal: { select: { id: true, name: true } },
+        convertedToContact: { select: { id: true, firstName: true, lastName: true } },
+        convertedToDeal: { select: { id: true, name: true } },
       },
     });
 

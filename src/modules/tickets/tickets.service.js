@@ -3,12 +3,33 @@ import { NotFoundError } from '@crm360/shared';
 import { eventBus, createEvent, EventTypes } from '../../common/events/event-bus.js';
 
 class TicketsService {
+  // Helper to get stage IDs by name from Support Pipeline
+  async getStageByName(tenantId, stageName) {
+    const pipeline = await prisma.pipeline.findFirst({
+      where: { tenantId, name: 'Support Pipeline' },
+      include: {
+        stages: {
+          where: { name: stageName },
+          take: 1,
+        },
+      },
+    });
+    return pipeline?.stages[0];
+  }
+
   async getTickets(tenantId, filters) {
     const where = { tenantId };
 
-    if (filters.status) where.status = filters.status;
+    // Use stageId for status filtering instead of non-existent status field
+    if (filters.status) {
+      const stage = await this.getStageByName(tenantId, filters.status);
+      if (stage) {
+        where.stageId = stage.id;
+      }
+    }
+    if (filters.stageId) where.stageId = filters.stageId;
     if (filters.priority) where.priority = filters.priority;
-    if (filters.assignedTo) where.assignedTo = filters.assignedTo;
+    if (filters.assignedTo) where.assignedToId = filters.assignedTo;
 
     if (filters.search) {
       where.OR = [
@@ -22,6 +43,8 @@ class TicketsService {
         where,
         include: {
           contact: { select: { id: true, firstName: true, lastName: true, email: true } },
+          stages: { select: { id: true, name: true, color: true } },
+          users: { select: { id: true, firstName: true, lastName: true } },
         },
         skip: (filters.page - 1) * filters.limit,
         take: filters.limit,
@@ -30,24 +53,11 @@ class TicketsService {
       prisma.ticket.count({ where }),
     ]);
 
-    // Fetch assigned user info separately since assignedTo is a string field
-    const assignedUserIds = [
-      ...new Set(tickets.filter((t) => t.assignedTo).map((t) => t.assignedTo)),
-    ];
-    const assignedUsers =
-      assignedUserIds.length > 0
-        ? await prisma.user.findMany({
-            where: { id: { in: assignedUserIds } },
-            select: { id: true, firstName: true, lastName: true },
-          })
-        : [];
-
-    const userMap = new Map(assignedUsers.map((u) => [u.id, u]));
-
-    // Enrich tickets with assigned user data
+    // Map to include status from stage name for backwards compatibility
     const enrichedTickets = tickets.map((ticket) => ({
       ...ticket,
-      assignedToUser: ticket.assignedTo ? userMap.get(ticket.assignedTo) || null : null,
+      status: ticket.stages?.name || 'Unknown',
+      assignedToUser: ticket.users || null,
     }));
 
     return {
@@ -66,6 +76,8 @@ class TicketsService {
       where: { id: ticketId, tenantId },
       include: {
         contact: true,
+        stages: { select: { id: true, name: true, color: true } },
+        users: { select: { id: true, firstName: true, lastName: true } },
       },
     });
 
@@ -73,27 +85,41 @@ class TicketsService {
       throw new NotFoundError('Ticket not found');
     }
 
-    // Fetch assigned user if exists
-    let assignedToUser = null;
-    if (ticket.assignedTo) {
-      assignedToUser = await prisma.user.findUnique({
-        where: { id: ticket.assignedTo },
-        select: { id: true, firstName: true, lastName: true },
-      });
-    }
-
-    // Note: Activity model doesn't have entityType/entityId/notes fields
-    // Comments will be stored in ticket.metadata.comments for now
-    const comments = ticket.metadata?.comments || [];
+    // Get comments from customFields since metadata doesn't exist
+    const comments = ticket.customFields?.comments || [];
 
     return {
       ...ticket,
-      assignedToUser,
+      status: ticket.stages?.name || 'Unknown',
+      assignedToUser: ticket.users || null,
       comments,
     };
   }
 
   async createTicket(tenantId, userId, data) {
+    // Find support pipeline for this tenant
+    const supportPipeline = await prisma.pipeline.findFirst({
+      where: {
+        tenantId,
+        name: 'Support Pipeline',
+      },
+      include: {
+        stages: {
+          where: { name: 'New' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!supportPipeline) {
+      throw new Error('Support pipeline not found. Please contact administrator.');
+    }
+
+    const newStage = supportPipeline.stages[0];
+    if (!newStage) {
+      throw new Error('Support pipeline "New" stage not found.');
+    }
+
     const ticket = await prisma.ticket.create({
       data: {
         tenantId,
@@ -102,27 +128,28 @@ class TicketsService {
         contactId: data.contactId,
         priority: data.priority || 'MEDIUM',
         category: data.category,
-        status: 'OPEN',
-        assignedTo: userId,
+        assignedToId: userId,
+        pipelineId: supportPipeline.id,
+        stageId: newStage.id,
       },
       include: {
         contact: { select: { id: true, firstName: true, lastName: true } },
+        stages: { select: { id: true, name: true, color: true } },
       },
     });
-
-    // Note: Activity model doesn't have entityType/entityId fields
-    // Skipping activity creation for now - can be added later with proper schema
 
     try {
       eventBus.publish(
         createEvent(EventTypes.TICKET_CREATED, tenantId, { ticketId: ticket.id }, { userId })
       );
     } catch (e) {
-      // Event bus errors shouldn't fail the operation
       console.error('Event publish error:', e);
     }
 
-    return ticket;
+    return {
+      ...ticket,
+      status: ticket.stages?.name || 'New',
+    };
   }
 
   async updateTicket(tenantId, ticketId, data) {
@@ -139,18 +166,30 @@ class TicketsService {
     if (data.subject !== undefined) updateData.subject = data.subject;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.priority !== undefined) updateData.priority = data.priority;
-    if (data.status !== undefined) updateData.status = data.status;
     if (data.category !== undefined) updateData.category = data.category;
+
+    // Handle status update by changing stageId
+    if (data.status !== undefined) {
+      const stage = await this.getStageByName(tenantId, data.status);
+      if (stage) {
+        updateData.stageId = stage.id;
+      }
+    }
+    if (data.stageId !== undefined) updateData.stageId = data.stageId;
 
     const updated = await prisma.ticket.update({
       where: { id: ticketId },
       data: updateData,
       include: {
         contact: { select: { id: true, firstName: true, lastName: true } },
+        stages: { select: { id: true, name: true, color: true } },
       },
     });
 
-    return updated;
+    return {
+      ...updated,
+      status: updated.stages?.name || 'Unknown',
+    };
   }
 
   async assignTicket(tenantId, ticketId, assignedToId) {
@@ -174,10 +213,11 @@ class TicketsService {
 
     const updated = await prisma.ticket.update({
       where: { id: ticketId },
-      data: { assignedTo: assignedToId },
+      data: { assignedToId: assignedToId },
+      include: {
+        stages: { select: { id: true, name: true, color: true } },
+      },
     });
-
-    // Note: Skipping activity creation - Activity model doesn't have entityType/entityId
 
     try {
       eventBus.publish(
@@ -189,6 +229,7 @@ class TicketsService {
 
     return {
       ...updated,
+      status: updated.stages?.name || 'Unknown',
       assignedToUser: user,
     };
   }
@@ -202,11 +243,22 @@ class TicketsService {
       throw new NotFoundError('Ticket not found');
     }
 
+    // Find the "Resolved" stage in Support Pipeline
+    const resolvedStage = await this.getStageByName(tenantId, 'Resolved');
+
+    const updateData = {
+      resolvedAt: new Date(),
+    };
+
+    if (resolvedStage) {
+      updateData.stageId = resolvedStage.id;
+    }
+
     const updated = await prisma.ticket.update({
       where: { id: ticketId },
-      data: {
-        status: 'RESOLVED',
-        resolvedAt: new Date(),
+      data: updateData,
+      include: {
+        stages: { select: { id: true, name: true, color: true } },
       },
     });
 
@@ -216,7 +268,10 @@ class TicketsService {
       console.error('Event publish error:', e);
     }
 
-    return updated;
+    return {
+      ...updated,
+      status: updated.stages?.name || 'Resolved',
+    };
   }
 
   async addComment(tenantId, ticketId, userId, content, isInternal) {
@@ -234,8 +289,8 @@ class TicketsService {
       select: { id: true, firstName: true, lastName: true },
     });
 
-    // Store comments in ticket.metadata
-    const existingComments = ticket.metadata?.comments || [];
+    // Store comments in customFields since metadata doesn't exist
+    const existingComments = ticket.customFields?.comments || [];
     const newComment = {
       id: `comment-${Date.now()}`,
       content,
@@ -250,8 +305,8 @@ class TicketsService {
     await prisma.ticket.update({
       where: { id: ticketId },
       data: {
-        metadata: {
-          ...(ticket.metadata || {}),
+        customFields: {
+          ...(ticket.customFields || {}),
           comments: updatedComments,
         },
       },
@@ -261,7 +316,6 @@ class TicketsService {
   }
 
   async getSLAPolicies(tenantId) {
-    // Check if SLAPolicy model exists
     try {
       const policies = await prisma.sLAPolicy.findMany({
         where: { tenantId },
@@ -269,7 +323,6 @@ class TicketsService {
       });
       return policies;
     } catch (e) {
-      // Model may not exist, return empty array
       console.error('SLAPolicy query error:', e.message);
       return [];
     }
@@ -277,16 +330,35 @@ class TicketsService {
 
   async getTicketStats(tenantId) {
     try {
+      // Get stages from Support Pipeline to count by stage name
+      const pipeline = await prisma.pipeline.findFirst({
+        where: { tenantId, name: 'Support Pipeline' },
+        include: { stages: true },
+      });
+
+      if (!pipeline) {
+        return { open: 0, inProgress: 0, resolved: 0, total: 0 };
+      }
+
+      const stageMap = new Map(pipeline.stages.map((s) => [s.name.toLowerCase(), s.id]));
+
+      const openStageId = stageMap.get('new') || stageMap.get('open');
+      const inProgressStageId = stageMap.get('in progress') || stageMap.get('in_progress');
+      const resolvedStageId = stageMap.get('resolved') || stageMap.get('closed');
+
       const [open, inProgress, resolved, total] = await Promise.all([
-        prisma.ticket.count({ where: { tenantId, status: 'OPEN' } }),
-        prisma.ticket.count({ where: { tenantId, status: 'IN_PROGRESS' } }),
-        prisma.ticket.count({ where: { tenantId, status: 'RESOLVED' } }),
+        openStageId ? prisma.ticket.count({ where: { tenantId, stageId: openStageId } }) : 0,
+        inProgressStageId
+          ? prisma.ticket.count({ where: { tenantId, stageId: inProgressStageId } })
+          : 0,
+        resolvedStageId
+          ? prisma.ticket.count({ where: { tenantId, stageId: resolvedStageId } })
+          : 0,
         prisma.ticket.count({ where: { tenantId } }),
       ]);
 
       return { open, inProgress, resolved, total };
     } catch (error) {
-      // Graceful degradation if stats query fails
       console.error('Ticket stats error:', error.message);
       return { open: 0, inProgress: 0, resolved: 0, total: 0 };
     }
