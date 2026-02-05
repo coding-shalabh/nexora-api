@@ -274,7 +274,30 @@ class PipelineService {
 
     if (filters.pipelineId) where.pipelineId = filters.pipelineId;
     if (filters.stageId) where.stageId = filters.stageId;
-    if (filters.status) where.status = filters.status;
+
+    // Handle status filter by finding matching stage names
+    // Status WON -> stage "Closed Won", status LOST -> stage "Closed Lost"
+    if (filters.status) {
+      const statusToStageMap = {
+        WON: 'Closed Won',
+        LOST: 'Closed Lost',
+        OPEN: ['Lead', 'Contacted', 'Qualified', 'Proposal', 'Negotiation'],
+      };
+      const stageName = statusToStageMap[filters.status.toUpperCase()];
+      if (stageName) {
+        const stages = await prisma.stage.findMany({
+          where: {
+            name: Array.isArray(stageName) ? { in: stageName } : stageName,
+            pipeline: { tenantId },
+          },
+          select: { id: true },
+        });
+        if (stages.length > 0) {
+          where.stageId = { in: stages.map((s) => s.id) };
+        }
+      }
+    }
+
     if (filters.assignedTo) where.ownerId = filters.assignedTo;
     if (filters.contactId) where.contactId = filters.contactId;
     if (filters.companyId) where.companyId = filters.companyId;
