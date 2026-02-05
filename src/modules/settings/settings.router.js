@@ -151,13 +151,16 @@ router.get(
 router.patch('/organization', authorize('settings:update'), async (req, res, next) => {
   try {
     const tenantId = req.tenantId;
+    // Transform empty strings to undefined for optional URL/email fields
+    const emptyToUndefined = z.literal('').transform(() => undefined);
+
     const schema = z.object({
       name: z.string().min(1).optional(),
       logoUrl: z.string().url().nullable().optional(),
       address: z.string().optional(),
       phone: z.string().optional(),
-      email: z.string().email().optional(),
-      website: z.string().url().optional(),
+      email: z.string().email().optional().or(emptyToUndefined),
+      website: z.string().url().optional().or(emptyToUndefined),
       timezone: z.string().optional(),
       currency: z.string().optional(),
       locale: z.string().optional(),

@@ -19,7 +19,7 @@ COPY src ./src
 COPY packages ./packages
 
 # Cache buster for Prisma generation
-ARG CACHEBUST=2026011707
+ARG CACHEBUST=2026020501
 # Generate Prisma client
 RUN cd packages/database && npx prisma generate
 

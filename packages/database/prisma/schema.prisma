@@ -138,6 +138,7 @@ model Workspace {
   currency     String?
   workingHours Json?
   holidays     Json?
+  settings     Json?
   isDefault    Boolean         @default(false)
   status       WorkspaceStatus @default(ACTIVE)
   createdAt    DateTime        @default(now())
@@ -171,6 +172,8 @@ model User {
   updatedAt                            DateTime                    @updatedAt
   verificationResendCount              Int                         @default(0)
   isOnline                             Boolean                     @default(false)
+  onlineStatus                         String?                     @default("offline")
+  lastActiveAt                         DateTime?
   lastSeenAt                           DateTime?
   assignedActivities                   Activity[]                  @relation("ActivityAssignedTo")
   createdActivities                    Activity[]                  @relation("ActivityCreatedBy")
@@ -181,7 +184,7 @@ model User {
   assignedConversations                Conversation[]              @relation("AssignedConversations")
   deals                                Deal[]
   email_verification_tokens            email_verification_tokens[]
-  integrations                         integrations[]
+  integrations                         Integration[]               @relation("IntegrationConnectedBy")
   leads                                Lead[]
   password_reset_tokens                password_reset_tokens[]
   sessions                             Session[]
@@ -1883,30 +1886,34 @@ model InboxSLAPolicy {
   @@map("inbox_sla_policies")
 }
 
-model integrations {
+model Integration {
   id             String            @id @default(cuid())
   tenantId       String
   name           String
-  type           String
-  provider       String
+  type           String // crm, communication, automation, ecommerce, productivity, messaging_provider
+  provider       String // salesforce, hubspot, slack, zapier, msg91, twilio, gupshup, etc.
   status         IntegrationStatus @default(PENDING)
   config         Json?
-  credentials    Json?
+  credentials    Json? // Encrypted credentials (tokens, keys) - { authKey, apiKey, accountSid, apiSecret }
   lastSyncAt     DateTime?
   syncStatus     SyncStatus?
   syncErrors     Json?
   connectedById  String
   disconnectedAt DateTime?
   createdAt      DateTime          @default(now())
-  updatedAt      DateTime @updatedAt
+  updatedAt      DateTime          @updatedAt
   isValidated    Boolean           @default(false)
   lastTestedAt   DateTime?
   testResult     String?
-  users          User              @relation(fields: [connectedById], references: [id])
+  stats          Json? // { sent: 0, delivered: 0, failed: 0, deliveryRate: 0, lastSentAt, lastDeliveredAt }
+  services       String[] // Array of services this integration provides (whatsapp, sms, email, voice)
+
+  connectedBy    User              @relation("IntegrationConnectedBy", fields: [connectedById], references: [id])
 
   @@unique([tenantId, provider])
   @@index([tenantId])
   @@index([tenantId, type])
+  @@map("integrations")
 }
 
 model InvoiceLine {

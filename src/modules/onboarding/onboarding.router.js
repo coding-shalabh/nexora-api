@@ -451,7 +451,7 @@ router.post('/add-user', async (req, res) => {
         passwordHash,
         status: 'ACTIVE',
         emailVerified: true,
-        onlineStatus: 'online',
+        isOnline: true,
         settings: { timezone: 'Asia/Kolkata' },
       },
     });
