@@ -219,6 +219,47 @@ router.get('/counts', async (req, res, next) => {
 });
 
 /**
+ * Get inbox analytics
+ */
+router.get('/analytics', async (req, res, next) => {
+  try {
+    const params = z
+      .object({
+        period: z.enum(['24h', '7d', '30d', '90d']).default('7d'),
+      })
+      .parse(req.query);
+
+    // Calculate date range based on period
+    const now = new Date();
+    let dateFrom;
+    switch (params.period) {
+      case '24h':
+        dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30d':
+        dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90d':
+        dateFrom = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+    }
+
+    // Get analytics data from service
+    const analytics = await inboxService.getAnalytics(req.tenantId, dateFrom, now);
+
+    res.json({
+      success: true,
+      data: analytics,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * Get inbox activity logs
  */
 router.get('/activity', async (req, res, next) => {
@@ -317,6 +358,49 @@ router.post('/conversations/:id/messages', async (req, res, next) => {
     res.status(201).json({
       success: true,
       data: message,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Get conversation notes
+ */
+router.get('/conversations/:id/notes', async (req, res, next) => {
+  try {
+    const notes = await inboxService.getConversationNotes(req.tenantId, req.params.id);
+
+    res.json({
+      success: true,
+      data: notes,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Add note to conversation
+ */
+router.post('/conversations/:id/notes', async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        content: z.string().min(1),
+      })
+      .parse(req.body);
+
+    const note = await inboxService.addConversationNote(
+      req.tenantId,
+      req.params.id,
+      req.userId,
+      data.content
+    );
+
+    res.status(201).json({
+      success: true,
+      data: note,
     });
   } catch (error) {
     next(error);

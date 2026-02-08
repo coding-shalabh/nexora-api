@@ -100,63 +100,503 @@ class AutomationService {
     }
     return 'crm';
   }
-  async getWorkflows(tenantId, filters) {
-    // Mock data - workflow schema not yet implemented
-    return [];
+  async getWorkflows(tenantId, filters = {}) {
+    const where = { tenantId };
+
+    // Map API status to isActive boolean
+    if (filters.status === 'ACTIVE') {
+      where.isActive = true;
+    } else if (filters.status === 'PAUSED' || filters.status === 'DRAFT') {
+      where.isActive = false;
+    }
+
+    const workflows = await prisma.workflows.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }],
+      include: {
+        workflow_triggers: true,
+        workflow_actions: { orderBy: { order: 'asc' } },
+        workflow_conditions: { orderBy: { order: 'asc' } },
+        _count: {
+          select: { workflow_executions: true },
+        },
+      },
+    });
+
+    // Transform to API format
+    return workflows.map((wf) => this.transformWorkflowToApi(wf));
   }
 
   async getWorkflow(tenantId, workflowId) {
-    // Mock data - workflow schema not yet implemented
-    throw new NotFoundError('Workflow not found');
+    const workflow = await prisma.workflows.findFirst({
+      where: { id: workflowId, tenantId },
+      include: {
+        workflow_triggers: true,
+        workflow_actions: { orderBy: { order: 'asc' } },
+        workflow_conditions: { orderBy: { order: 'asc' } },
+        workflow_executions: {
+          take: 10,
+          orderBy: { startedAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            startedAt: true,
+            completedAt: true,
+            error: true,
+          },
+        },
+      },
+    });
+
+    if (!workflow) {
+      throw new NotFoundError('Workflow not found');
+    }
+
+    return this.transformWorkflowToApi(workflow);
   }
 
   async createWorkflow(tenantId, userId, data) {
-    // Mock data - workflow schema not yet implemented
-    return {
-      id: 'wf_' + Date.now(),
-      tenantId,
-      name: data.name,
-      description: data.description,
-      trigger: data.trigger,
-      conditions: data.conditions || [],
-      actions: data.actions,
-      status: 'DRAFT',
-      createdById: userId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    // Create workflow with triggers, conditions, actions in transaction
+    const workflow = await prisma.$transaction(async (tx) => {
+      // Create main workflow
+      const wf = await tx.workflows.create({
+        data: {
+          tenantId,
+          name: data.name,
+          description: data.description || null,
+          isActive: false,
+          createdById: userId,
+        },
+      });
+
+      // Create trigger
+      if (data.trigger) {
+        await tx.workflow_triggers.create({
+          data: {
+            workflowId: wf.id,
+            type: data.trigger.type,
+            config: data.trigger.config || {},
+          },
+        });
+      }
+
+      // Create conditions
+      if (data.conditions?.length > 0) {
+        await tx.workflow_conditions.createMany({
+          data: data.conditions.map((c, index) => ({
+            workflowId: wf.id,
+            field: c.field,
+            operator: c.operator,
+            value: c.value,
+            order: index,
+          })),
+        });
+      }
+
+      // Create actions
+      if (data.actions?.length > 0) {
+        await tx.workflow_actions.createMany({
+          data: data.actions.map((a, index) => ({
+            workflowId: wf.id,
+            type: a.type,
+            config: a.config || {},
+            order: index,
+          })),
+        });
+      }
+
+      return wf;
+    });
+
+    this.logger.info({ workflowId: workflow.id, name: workflow.name }, 'Workflow created');
+
+    // Fetch complete workflow with relations
+    return this.getWorkflow(tenantId, workflow.id);
   }
 
   async updateWorkflow(tenantId, workflowId, data) {
-    // Mock data - workflow schema not yet implemented
-    throw new NotFoundError('Workflow not found');
+    const existing = await prisma.workflows.findFirst({
+      where: { id: workflowId, tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Workflow not found');
+    }
+
+    // Don't allow editing active workflows without pausing first
+    if (existing.isActive && (data.trigger || data.actions || data.conditions)) {
+      throw new ValidationError(
+        'Cannot modify trigger/actions/conditions of an active workflow. Pause it first.'
+      );
+    }
+
+    // Update in transaction
+    await prisma.$transaction(async (tx) => {
+      // Update main workflow
+      const updateData = {};
+      if (data.name !== undefined) updateData.name = data.name;
+      if (data.description !== undefined) updateData.description = data.description;
+
+      if (Object.keys(updateData).length > 0) {
+        await tx.workflows.update({
+          where: { id: workflowId },
+          data: updateData,
+        });
+      }
+
+      // Update trigger
+      if (data.trigger !== undefined) {
+        await tx.workflow_triggers.deleteMany({ where: { workflowId } });
+        if (data.trigger) {
+          await tx.workflow_triggers.create({
+            data: {
+              workflowId,
+              type: data.trigger.type,
+              config: data.trigger.config || {},
+            },
+          });
+        }
+      }
+
+      // Update conditions
+      if (data.conditions !== undefined) {
+        await tx.workflow_conditions.deleteMany({ where: { workflowId } });
+        if (data.conditions?.length > 0) {
+          await tx.workflow_conditions.createMany({
+            data: data.conditions.map((c, index) => ({
+              workflowId,
+              field: c.field,
+              operator: c.operator,
+              value: c.value,
+              order: index,
+            })),
+          });
+        }
+      }
+
+      // Update actions
+      if (data.actions !== undefined) {
+        await tx.workflow_actions.deleteMany({ where: { workflowId } });
+        if (data.actions?.length > 0) {
+          await tx.workflow_actions.createMany({
+            data: data.actions.map((a, index) => ({
+              workflowId,
+              type: a.type,
+              config: a.config || {},
+              order: index,
+            })),
+          });
+        }
+      }
+    });
+
+    this.logger.info({ workflowId, updates: Object.keys(data) }, 'Workflow updated');
+
+    return this.getWorkflow(tenantId, workflowId);
   }
 
   async activateWorkflow(tenantId, workflowId) {
-    // Mock data - workflow schema not yet implemented
-    throw new NotFoundError('Workflow not found');
+    const existing = await prisma.workflows.findFirst({
+      where: { id: workflowId, tenantId },
+      include: {
+        workflow_triggers: true,
+        workflow_actions: true,
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Workflow not found');
+    }
+
+    // Validate workflow has required fields
+    if (existing.workflow_triggers.length === 0 || existing.workflow_actions.length === 0) {
+      throw new ValidationError(
+        'Workflow must have a trigger and at least one action to be activated'
+      );
+    }
+
+    await prisma.workflows.update({
+      where: { id: workflowId },
+      data: { isActive: true },
+    });
+
+    this.logger.info(
+      { workflowId, trigger: existing.workflow_triggers[0]?.type },
+      'Workflow activated'
+    );
+
+    // Register trigger listener if needed
+    const workflow = await this.getWorkflow(tenantId, workflowId);
+    this.registerWorkflowTrigger(workflow);
+
+    return workflow;
   }
 
   async pauseWorkflow(tenantId, workflowId) {
-    // Mock data - workflow schema not yet implemented
-    throw new NotFoundError('Workflow not found');
+    const existing = await prisma.workflows.findFirst({
+      where: { id: workflowId, tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Workflow not found');
+    }
+
+    await prisma.workflows.update({
+      where: { id: workflowId },
+      data: { isActive: false },
+    });
+
+    this.logger.info({ workflowId }, 'Workflow paused');
+
+    // Unregister trigger listener
+    this.unregisterWorkflowTrigger(workflowId);
+
+    return this.getWorkflow(tenantId, workflowId);
   }
 
-  async getExecutions(tenantId, workflowId, filters) {
-    // Mock data - workflow schema not yet implemented
-    throw new NotFoundError('Workflow not found');
+  async getExecutions(tenantId, workflowId, filters = {}) {
+    const existing = await prisma.workflows.findFirst({
+      where: { id: workflowId, tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Workflow not found');
+    }
+
+    const page = filters.page || 1;
+    const limit = filters.limit || 25;
+    const skip = (page - 1) * limit;
+
+    const [executions, total] = await Promise.all([
+      prisma.workflow_executions.findMany({
+        where: { workflowId, tenantId },
+        orderBy: { startedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.workflow_executions.count({
+        where: { workflowId, tenantId },
+      }),
+    ]);
+
+    return {
+      executions,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async deleteWorkflow(tenantId, workflowId) {
-    // Mock data - workflow schema not yet implemented
-    throw new NotFoundError('Workflow not found');
+    const existing = await prisma.workflows.findFirst({
+      where: { id: workflowId, tenantId },
+    });
+
+    if (!existing) {
+      throw new NotFoundError('Workflow not found');
+    }
+
+    // Unregister trigger if active
+    if (existing.isActive) {
+      this.unregisterWorkflowTrigger(workflowId);
+    }
+
+    await prisma.workflows.delete({
+      where: { id: workflowId },
+    });
+
+    this.logger.info({ workflowId }, 'Workflow deleted');
+  }
+
+  // Transform database workflow to API format
+  transformWorkflowToApi(wf) {
+    const trigger =
+      wf.workflow_triggers?.length > 0
+        ? {
+            type: wf.workflow_triggers[0].type,
+            config: wf.workflow_triggers[0].config,
+          }
+        : null;
+
+    const conditions = (wf.workflow_conditions || []).map((c) => ({
+      field: c.field,
+      operator: c.operator,
+      value: c.value,
+    }));
+
+    const actions = (wf.workflow_actions || []).map((a) => ({
+      type: a.type,
+      config: a.config,
+    }));
+
+    return {
+      id: wf.id,
+      tenantId: wf.tenantId,
+      name: wf.name,
+      description: wf.description,
+      status: wf.isActive ? 'ACTIVE' : 'DRAFT',
+      trigger,
+      conditions,
+      actions,
+      version: wf.version,
+      createdById: wf.createdById,
+      createdAt: wf.createdAt,
+      updatedAt: wf.updatedAt,
+      executionCount: wf._count?.workflow_executions || 0,
+      executions: wf.workflow_executions,
+    };
+  }
+
+  // Register a workflow's trigger to listen for events
+  registerWorkflowTrigger(workflow) {
+    const triggerType = workflow.trigger?.type;
+    if (!triggerType) return;
+
+    // Map trigger types to event bus events
+    const eventType = this.mapTriggerToEvent(triggerType);
+    if (eventType) {
+      this.logger.info(
+        { workflowId: workflow.id, triggerType, eventType },
+        'Registering workflow trigger'
+      );
+      // Event subscription would be registered here
+      // eventBus.on(eventType, (data) => this.handleTriggerEvent(workflow.id, data));
+    }
+  }
+
+  // Unregister workflow trigger
+  unregisterWorkflowTrigger(workflowId) {
+    this.logger.info({ workflowId }, 'Unregistering workflow trigger');
+    // Would remove event listener here
+  }
+
+  // Map trigger type to event bus event
+  mapTriggerToEvent(triggerType) {
+    const mapping = {
+      'contact.created': EventTypes.CONTACT_CREATED,
+      'contact.updated': EventTypes.CONTACT_UPDATED,
+      'lead.created': EventTypes.LEAD_CREATED,
+      'deal.created': EventTypes.DEAL_CREATED,
+      'deal.stage_changed': EventTypes.DEAL_STAGE_CHANGED,
+      'message.received': EventTypes.MESSAGE_RECEIVED,
+      'form.submitted': EventTypes.FORM_SUBMITTED,
+    };
+    return mapping[triggerType];
   }
 
   // Execute a workflow (called by the event listener)
-  async executeWorkflow(workflowId, triggerData) {
-    // Mock data - workflow schema not yet implemented
-    // This method would be called by event bus when workflows are active
-    return;
+  async executeWorkflow(workflowId, triggerData, context = {}) {
+    const workflow = await prisma.workflows.findUnique({
+      where: { id: workflowId },
+      include: {
+        workflow_actions: { orderBy: { order: 'asc' } },
+        workflow_conditions: { orderBy: { order: 'asc' } },
+      },
+    });
+
+    if (!workflow || !workflow.isActive) {
+      this.logger.warn({ workflowId }, 'Workflow not found or not active');
+      return null;
+    }
+
+    // Create execution record
+    const execution = await prisma.workflow_executions.create({
+      data: {
+        workflowId,
+        tenantId: workflow.tenantId,
+        triggerEvent: triggerData.event || 'manual',
+        triggerData: triggerData,
+        status: 'RUNNING',
+      },
+    });
+
+    const conditionResults = [];
+    const actionResults = [];
+
+    try {
+      // Check conditions
+      for (const condition of workflow.workflow_conditions) {
+        const passed = this.evaluateCondition(
+          {
+            config: {
+              field: condition.field,
+              operator: condition.operator,
+              value: condition.value,
+            },
+          },
+          { ...context, ...triggerData }
+        );
+        conditionResults.push({ conditionId: condition.id, passed });
+        if (!passed) {
+          await prisma.workflow_executions.update({
+            where: { id: execution.id },
+            data: {
+              status: 'COMPLETED',
+              completedAt: new Date(),
+              conditionResults,
+              actionResults,
+            },
+          });
+          return execution;
+        }
+      }
+
+      // Execute actions sequentially
+      for (const action of workflow.workflow_actions) {
+        try {
+          await this.executeAction(
+            workflow.tenantId,
+            { type: action.type, config: action.config },
+            { ...context, ...triggerData, workflowId }
+          );
+          actionResults.push({ actionId: action.id, status: 'completed' });
+        } catch (actionError) {
+          actionResults.push({
+            actionId: action.id,
+            status: 'failed',
+            error: actionError.message,
+          });
+          throw actionError;
+        }
+      }
+
+      // Mark as completed
+      await prisma.workflow_executions.update({
+        where: { id: execution.id },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          conditionResults,
+          actionResults,
+        },
+      });
+
+      this.logger.info({ workflowId, executionId: execution.id }, 'Workflow executed successfully');
+
+      return execution;
+    } catch (error) {
+      // Mark as failed
+      await prisma.workflow_executions.update({
+        where: { id: execution.id },
+        data: {
+          status: 'FAILED',
+          completedAt: new Date(),
+          error: error.message,
+          conditionResults,
+          actionResults,
+        },
+      });
+
+      this.logger.error(
+        { workflowId, executionId: execution.id, error: error.message },
+        'Workflow execution failed'
+      );
+
+      return execution;
+    }
   }
 
   async executeAction(tenantId, action, context) {

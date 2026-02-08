@@ -10,25 +10,56 @@ export const campaignService = {
    * List campaigns with pagination and filters
    */
   async list({ tenantId, page = 1, limit = 20, status, type, search }) {
-    // TODO: Campaigns feature not yet implemented - MarketingCampaign model doesn't exist
-    // Return empty data for now with proper structure
+    const where = { tenantId };
+
+    if (status) where.status = status;
+    if (type) where.type = type;
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [campaigns, total, statusCounts] = await Promise.all([
+      prisma.marketing_campaigns.findMany({
+        where,
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.marketing_campaigns.count({ where }),
+      prisma.marketing_campaigns.groupBy({
+        by: ['status'],
+        where: { tenantId },
+        _count: { status: true },
+      }),
+    ]);
+
+    const counts = {
+      total: 0,
+      DRAFT: 0,
+      SCHEDULED: 0,
+      ACTIVE: 0,
+      PAUSED: 0,
+      COMPLETED: 0,
+      CANCELLED: 0,
+    };
+
+    statusCounts.forEach(({ status, _count }) => {
+      counts[status] = _count.status;
+      counts.total += _count.status;
+    });
+
     return {
-      data: [],
+      data: campaigns,
       pagination: {
         page,
         limit,
-        total: 0,
-        totalPages: 0,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-      counts: {
-        total: 0,
-        draft: 0,
-        scheduled: 0,
-        active: 0,
-        paused: 0,
-        completed: 0,
-        cancelled: 0,
-      },
+      counts,
     };
   },
 
@@ -36,17 +67,17 @@ export const campaignService = {
    * Get a single campaign by ID
    */
   async get({ tenantId, campaignId }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
       include: {
         broadcasts: {
           include: {
-            _count: { select: { recipients: true } },
+            _count: { select: { broadcast_recipients: true } },
           },
         },
         sequences: {
           include: {
-            _count: { select: { steps: true, enrollments: true } },
+            _count: { select: { sequence_steps: true, sequence_enrollments: true } },
           },
         },
       },
@@ -70,7 +101,7 @@ export const campaignService = {
     const whereDate = Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {};
 
     // Campaign stats
-    const campaignStats = await prisma.marketingCampaign.aggregate({
+    const campaignStats = await prisma.marketing_campaigns.aggregate({
       where: { tenantId, ...whereDate },
       _sum: {
         sentCount: true,
@@ -85,7 +116,7 @@ export const campaignService = {
     });
 
     // Broadcast stats
-    const broadcastStats = await prisma.broadcast.aggregate({
+    const broadcastStats = await prisma.broadcasts.aggregate({
       where: { tenantId, ...whereDate },
       _sum: {
         sentCount: true,
@@ -169,7 +200,7 @@ export const campaignService = {
    * Get campaign analytics
    */
   async getAnalytics({ tenantId, campaignId }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
     });
 
@@ -178,7 +209,7 @@ export const campaignService = {
     }
 
     // Get broadcast stats for this campaign
-    const broadcastStats = await prisma.broadcast.aggregate({
+    const broadcastStats = await prisma.broadcasts.aggregate({
       where: { tenantId, campaignId },
       _sum: {
         totalRecipients: true,
@@ -194,17 +225,17 @@ export const campaignService = {
     });
 
     // Get sequence stats for this campaign
-    const sequenceStats = await prisma.sequenceEnrollment.aggregate({
+    const sequenceStats = await prisma.sequence_enrollments.aggregate({
       where: {
-        sequence: { campaignId, tenantId },
+        sequences: { campaignId, tenantId },
       },
       _count: { id: true },
     });
 
-    const sequenceStatusCounts = await prisma.sequenceEnrollment.groupBy({
+    const sequenceStatusCounts = await prisma.sequence_enrollments.groupBy({
       by: ['status'],
       where: {
-        sequence: { campaignId, tenantId },
+        sequences: { campaignId, tenantId },
       },
       _count: { status: true },
     });
@@ -311,7 +342,7 @@ export const campaignService = {
    * Create a new campaign
    */
   async create({ tenantId, userId, data }) {
-    const campaign = await prisma.marketingCampaign.create({
+    const campaign = await prisma.marketing_campaigns.create({
       data: {
         tenantId,
         createdById: userId,
@@ -340,7 +371,7 @@ export const campaignService = {
    * Update a campaign
    */
   async update({ tenantId, campaignId, data }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
     });
 
@@ -372,7 +403,7 @@ export const campaignService = {
     if (data.tags !== undefined) updateData.tags = data.tags;
     if (data.metadata !== undefined) updateData.metadata = data.metadata;
 
-    const updated = await prisma.marketingCampaign.update({
+    const updated = await prisma.marketing_campaigns.update({
       where: { id: campaignId },
       data: updateData,
     });
@@ -384,7 +415,7 @@ export const campaignService = {
    * Delete a campaign
    */
   async delete({ tenantId, campaignId }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
     });
 
@@ -397,7 +428,7 @@ export const campaignService = {
       throw new Error('Can only delete DRAFT campaigns');
     }
 
-    await prisma.marketingCampaign.delete({
+    await prisma.marketing_campaigns.delete({
       where: { id: campaignId },
     });
   },
@@ -406,7 +437,7 @@ export const campaignService = {
    * Activate a campaign
    */
   async activate({ tenantId, campaignId }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
     });
 
@@ -418,7 +449,7 @@ export const campaignService = {
       throw new Error(`Cannot activate campaign in ${campaign.status} status`);
     }
 
-    const updated = await prisma.marketingCampaign.update({
+    const updated = await prisma.marketing_campaigns.update({
       where: { id: campaignId },
       data: { status: 'ACTIVE' },
     });
@@ -430,7 +461,7 @@ export const campaignService = {
    * Pause a campaign
    */
   async pause({ tenantId, campaignId }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
     });
 
@@ -442,7 +473,7 @@ export const campaignService = {
       throw new Error('Can only pause ACTIVE campaigns');
     }
 
-    const updated = await prisma.marketingCampaign.update({
+    const updated = await prisma.marketing_campaigns.update({
       where: { id: campaignId },
       data: { status: 'PAUSED' },
     });
@@ -454,7 +485,7 @@ export const campaignService = {
    * Complete a campaign
    */
   async complete({ tenantId, campaignId }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
     });
 
@@ -462,7 +493,7 @@ export const campaignService = {
       throw new Error('Campaign not found');
     }
 
-    const updated = await prisma.marketingCampaign.update({
+    const updated = await prisma.marketing_campaigns.update({
       where: { id: campaignId },
       data: { status: 'COMPLETED' },
     });
@@ -474,7 +505,7 @@ export const campaignService = {
    * Duplicate a campaign
    */
   async duplicate({ tenantId, campaignId, userId }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
     });
 
@@ -482,7 +513,7 @@ export const campaignService = {
       throw new Error('Campaign not found');
     }
 
-    const newCampaign = await prisma.marketingCampaign.create({
+    const newCampaign = await prisma.marketing_campaigns.create({
       data: {
         tenantId,
         createdById: userId,
@@ -509,7 +540,7 @@ export const campaignService = {
    * Add broadcast to campaign
    */
   async addBroadcast({ tenantId, campaignId, broadcastId }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
     });
 
@@ -517,7 +548,7 @@ export const campaignService = {
       throw new Error('Campaign not found');
     }
 
-    const broadcast = await prisma.broadcast.findFirst({
+    const broadcast = await prisma.broadcasts.findFirst({
       where: { id: broadcastId, tenantId },
     });
 
@@ -525,12 +556,12 @@ export const campaignService = {
       throw new Error('Broadcast not found');
     }
 
-    await prisma.broadcast.update({
+    await prisma.broadcasts.update({
       where: { id: broadcastId },
       data: { campaignId },
     });
 
-    return prisma.marketingCampaign.findFirst({
+    return prisma.marketing_campaigns.findFirst({
       where: { id: campaignId },
       include: {
         broadcasts: true,
@@ -543,7 +574,7 @@ export const campaignService = {
    * Add sequence to campaign
    */
   async addSequence({ tenantId, campaignId, sequenceId }) {
-    const campaign = await prisma.marketingCampaign.findFirst({
+    const campaign = await prisma.marketing_campaigns.findFirst({
       where: { id: campaignId, tenantId },
     });
 
@@ -551,7 +582,7 @@ export const campaignService = {
       throw new Error('Campaign not found');
     }
 
-    const sequence = await prisma.sequence.findFirst({
+    const sequence = await prisma.sequences.findFirst({
       where: { id: sequenceId, tenantId },
     });
 
@@ -559,12 +590,12 @@ export const campaignService = {
       throw new Error('Sequence not found');
     }
 
-    await prisma.sequence.update({
+    await prisma.sequences.update({
       where: { id: sequenceId },
       data: { campaignId },
     });
 
-    return prisma.marketingCampaign.findFirst({
+    return prisma.marketing_campaigns.findFirst({
       where: { id: campaignId },
       include: {
         broadcasts: true,

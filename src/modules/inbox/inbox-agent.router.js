@@ -387,9 +387,9 @@ router.post('/canned-responses/:id/use', async (req, res, next) => {
  */
 router.get('/conversations/:threadId/notes', async (req, res, next) => {
   try {
-    const notes = await prisma.conversationNote.findMany({
+    const notes = await prisma.conversation_notes.findMany({
       where: {
-        conversationId: req.params.threadId,
+        threadId: req.params.threadId,
         tenantId: req.tenantId,
       },
       orderBy: [{ isPinned: 'desc' }, { createdAt: 'desc' }],
@@ -427,23 +427,41 @@ router.post('/conversations/:threadId/notes', async (req, res, next) => {
       })
       .parse(req.body);
 
-    // Verify thread exists and belongs to tenant
-    const thread = await prisma.conversation.findFirst({
+    // Verify conversation exists and belongs to tenant (check Conversation, ConversationThread, and CallSession)
+    let conversation = await prisma.conversation.findFirst({
       where: { id: req.params.threadId, tenantId: req.tenantId },
     });
 
-    if (!thread) {
-      return res.status(404).json({
-        success: false,
-        error: 'NOT_FOUND',
-        message: 'Conversation not found',
+    let isConversation = !!conversation;
+    let isCallSession = false;
+
+    if (!conversation) {
+      conversation = await prisma.conversationThread.findFirst({
+        where: { id: req.params.threadId, tenantId: req.tenantId },
       });
     }
 
-    const note = await prisma.conversationNote.create({
+    // Also check for CallSession (Voice channel)
+    if (!conversation) {
+      conversation = await prisma.callSession.findFirst({
+        where: { id: req.params.threadId, tenantId: req.tenantId },
+      });
+      isCallSession = !!conversation;
+    }
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        error: 'NOT_FOUND',
+        message: 'Conversation or call not found',
+      });
+    }
+
+    const note = await prisma.conversation_notes.create({
       data: {
         ...data,
-        conversationId: req.params.threadId,
+        threadId: req.params.threadId,
+        conversationId: isConversation ? req.params.threadId : null,
         tenantId: req.tenantId,
         userId: req.userId,
       },
@@ -477,7 +495,7 @@ router.patch('/conversations/:threadId/notes/:noteId', async (req, res, next) =>
       })
       .parse(req.body);
 
-    const note = await prisma.conversationNote.update({
+    const note = await prisma.conversation_notes.update({
       where: { id: req.params.noteId },
       data,
     });
@@ -496,7 +514,7 @@ router.patch('/conversations/:threadId/notes/:noteId', async (req, res, next) =>
  */
 router.delete('/conversations/:threadId/notes/:noteId', async (req, res, next) => {
   try {
-    await prisma.conversationNote.delete({
+    await prisma.conversation_notes.delete({
       where: { id: req.params.noteId },
     });
 
@@ -1188,8 +1206,8 @@ router.get('/analytics', async (req, res, next) => {
       _count: true,
     });
 
-    // Get messages by direction
-    const messagesByDirection = await prisma.conversationThread.groupBy({
+    // Get messages by direction (using message_events which has direction field)
+    const messagesByDirection = await prisma.message_events.groupBy({
       by: ['direction'],
       where: {
         tenantId: req.tenantId,
@@ -1198,8 +1216,8 @@ router.get('/analytics', async (req, res, next) => {
       _count: true,
     });
 
-    // Get conversations by channel
-    const conversationsByChannel = await prisma.conversationThread.groupBy({
+    // Get messages by channel (using message_events which has channel field)
+    const conversationsByChannel = await prisma.message_events.groupBy({
       by: ['channel'],
       where: {
         tenantId: req.tenantId,

@@ -29,10 +29,12 @@ const IP_CACHE_TIMEOUT = 60 * 60 * 1000; // 1 hour
 
 router.get('/dashboard', requirePermission('analytics:read'), async (req, res, next) => {
   try {
-    const params = z.object({
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-    }).parse(req.query);
+    const params = z
+      .object({
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+      .parse(req.query);
 
     const dashboard = await analyticsService.getDashboard(req.tenantId, params);
 
@@ -47,11 +49,13 @@ router.get('/dashboard', requirePermission('analytics:read'), async (req, res, n
 
 router.get('/pipeline', requirePermission('analytics:read'), async (req, res, next) => {
   try {
-    const params = z.object({
-      pipelineId: z.string().uuid().optional(),
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-    }).parse(req.query);
+    const params = z
+      .object({
+        pipelineId: z.string().uuid().optional(),
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+      .parse(req.query);
 
     const metrics = await analyticsService.getPipelineMetrics(req.tenantId, params);
 
@@ -66,10 +70,12 @@ router.get('/pipeline', requirePermission('analytics:read'), async (req, res, ne
 
 router.get('/inbox', requirePermission('analytics:read'), async (req, res, next) => {
   try {
-    const params = z.object({
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-    }).parse(req.query);
+    const params = z
+      .object({
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+      .parse(req.query);
 
     const metrics = await analyticsService.getInboxMetrics(req.tenantId, params);
 
@@ -84,10 +90,12 @@ router.get('/inbox', requirePermission('analytics:read'), async (req, res, next)
 
 router.get('/tickets', requirePermission('analytics:read'), async (req, res, next) => {
   try {
-    const params = z.object({
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-    }).parse(req.query);
+    const params = z
+      .object({
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+      .parse(req.query);
 
     const metrics = await analyticsService.getTicketMetrics(req.tenantId, params);
 
@@ -102,10 +110,12 @@ router.get('/tickets', requirePermission('analytics:read'), async (req, res, nex
 
 router.get('/team', requirePermission('analytics:read'), async (req, res, next) => {
   try {
-    const params = z.object({
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-    }).parse(req.query);
+    const params = z
+      .object({
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+      .parse(req.query);
 
     const metrics = await analyticsService.getTeamPerformance(req.tenantId, params);
 
@@ -121,10 +131,12 @@ router.get('/team', requirePermission('analytics:read'), async (req, res, next) 
 // Project Analytics
 router.get('/projects', requirePermission('analytics:read'), async (req, res, next) => {
   try {
-    const params = z.object({
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-    }).parse(req.query);
+    const params = z
+      .object({
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+      .parse(req.query);
 
     const metrics = await analyticsService.getProjectMetrics(req.tenantId, params);
 
@@ -140,11 +152,13 @@ router.get('/projects', requirePermission('analytics:read'), async (req, res, ne
 // Task Analytics
 router.get('/tasks', requirePermission('analytics:read'), async (req, res, next) => {
   try {
-    const params = z.object({
-      projectId: z.string().optional(),
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-    }).parse(req.query);
+    const params = z
+      .object({
+        projectId: z.string().optional(),
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+      .parse(req.query);
 
     const metrics = await analyticsService.getTaskMetrics(req.tenantId, params);
 
@@ -160,11 +174,13 @@ router.get('/tasks', requirePermission('analytics:read'), async (req, res, next)
 // Time Tracking Analytics
 router.get('/time-tracking', requirePermission('analytics:read'), async (req, res, next) => {
   try {
-    const params = z.object({
-      projectId: z.string().optional(),
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-    }).parse(req.query);
+    const params = z
+      .object({
+        projectId: z.string().optional(),
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+      .parse(req.query);
 
     const metrics = await analyticsService.getTimeTrackingMetrics(req.tenantId, params);
 
@@ -180,16 +196,253 @@ router.get('/time-tracking', requirePermission('analytics:read'), async (req, re
 // Comprehensive Overview Dashboard
 router.get('/overview', requirePermission('analytics:read'), async (req, res, next) => {
   try {
-    const params = z.object({
-      startDate: z.string().datetime().optional(),
-      endDate: z.string().datetime().optional(),
-    }).parse(req.query);
+    const params = z
+      .object({
+        startDate: z.string().datetime().optional(),
+        endDate: z.string().datetime().optional(),
+      })
+      .parse(req.query);
 
     const overview = await analyticsService.getOverviewDashboard(req.tenantId, params);
 
     res.json({
       success: true,
       data: overview,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==========================================
+// Goals
+// ==========================================
+
+// GET /analytics/goals - List analytics goals
+router.get('/goals', requirePermission('analytics:read'), async (req, res, next) => {
+  try {
+    const params = z
+      .object({
+        page: z.coerce.number().min(1).default(1),
+        limit: z.coerce.number().min(1).max(100).default(20),
+        type: z.enum(['REVENUE', 'CONVERSION', 'ENGAGEMENT', 'RETENTION']).optional(),
+        status: z.enum(['ACTIVE', 'COMPLETED', 'MISSED']).optional(),
+      })
+      .parse(req.query);
+
+    // For now, return placeholder data until full implementation
+    const goals = await analyticsService.getGoals(req.tenantId, params);
+
+    res.json({
+      success: true,
+      ...goals,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /analytics/goals - Create analytics goal
+router.post('/goals', requirePermission('analytics:write'), async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        name: z.string().min(1),
+        type: z.enum(['REVENUE', 'CONVERSION', 'ENGAGEMENT', 'RETENTION']),
+        targetValue: z.number().min(0),
+        startDate: z.string(),
+        endDate: z.string(),
+        metric: z.string().optional(),
+        description: z.string().optional(),
+      })
+      .parse(req.body);
+
+    const goal = await analyticsService.createGoal(req.tenantId, req.userId, data);
+
+    res.status(201).json({
+      success: true,
+      data: goal,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /analytics/goals/:id - Get goal details
+router.get('/goals/:id', requirePermission('analytics:read'), async (req, res, next) => {
+  try {
+    const goal = await analyticsService.getGoal(req.tenantId, req.params.id);
+
+    res.json({
+      success: true,
+      data: goal,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /analytics/goals/:id - Update goal
+router.put('/goals/:id', requirePermission('analytics:write'), async (req, res, next) => {
+  try {
+    const goal = await analyticsService.updateGoal(req.tenantId, req.params.id, req.body);
+
+    res.json({
+      success: true,
+      data: goal,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /analytics/goals/:id - Delete goal
+router.delete('/goals/:id', requirePermission('analytics:write'), async (req, res, next) => {
+  try {
+    await analyticsService.deleteGoal(req.tenantId, req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Goal deleted',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /analytics/goals/bulk - Bulk create/update goals
+router.post('/goals/bulk', requirePermission('analytics:write'), async (req, res, next) => {
+  try {
+    const { goals } = req.body;
+
+    if (!goals || !Array.isArray(goals)) {
+      return res.status(400).json({
+        success: false,
+        error: 'goals array is required',
+      });
+    }
+
+    const result = await analyticsService.bulkGoals(req.tenantId, req.userId, goals);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ==========================================
+// Reports
+// ==========================================
+
+// GET /analytics/reports - List reports
+router.get('/reports', requirePermission('analytics:read'), async (req, res, next) => {
+  try {
+    const params = z
+      .object({
+        page: z.coerce.number().min(1).default(1),
+        limit: z.coerce.number().min(1).max(100).default(20),
+        type: z.string().optional(),
+      })
+      .parse(req.query);
+
+    const reports = await analyticsService.getReports(req.tenantId, params);
+
+    res.json({
+      success: true,
+      ...reports,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /analytics/reports - Create report
+router.post('/reports', requirePermission('analytics:write'), async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        name: z.string().min(1),
+        type: z.enum(['SALES', 'MARKETING', 'SUPPORT', 'CUSTOM']),
+        config: z.record(z.any()).optional(),
+        schedule: z
+          .object({
+            frequency: z.enum(['DAILY', 'WEEKLY', 'MONTHLY']),
+            time: z.string().optional(),
+            recipients: z.array(z.string()).optional(),
+          })
+          .optional(),
+      })
+      .parse(req.body);
+
+    const report = await analyticsService.createReport(req.tenantId, req.userId, data);
+
+    res.status(201).json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /analytics/reports/:id - Get report
+router.get('/reports/:id', requirePermission('analytics:read'), async (req, res, next) => {
+  try {
+    const report = await analyticsService.getReport(req.tenantId, req.params.id);
+
+    res.json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /analytics/reports/:id/run - Run report
+router.post('/reports/:id/run', requirePermission('analytics:read'), async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.body;
+
+    const result = await analyticsService.runReport(req.tenantId, req.params.id, {
+      startDate,
+      endDate,
+    });
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// DELETE /analytics/reports/:id - Delete report
+router.delete('/reports/:id', requirePermission('analytics:write'), async (req, res, next) => {
+  try {
+    await analyticsService.deleteReport(req.tenantId, req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Report deleted',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /analytics/reports/scheduled - List scheduled reports
+router.get('/reports/scheduled', requirePermission('analytics:read'), async (req, res, next) => {
+  try {
+    const reports = await analyticsService.getScheduledReports(req.tenantId);
+
+    res.json({
+      success: true,
+      data: reports,
     });
   } catch (error) {
     next(error);

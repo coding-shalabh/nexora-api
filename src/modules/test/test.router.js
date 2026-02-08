@@ -5,8 +5,12 @@
 
 import { Router } from 'express';
 import { authenticate } from '../../common/middleware/authenticate.js';
+import mockAccountsRouter from './mock-accounts.router.js';
 
 const router = Router();
+
+// Mount mock accounts router
+router.use('/mock-accounts', mockAccountsRouter);
 
 /**
  * Get test utilities status
@@ -22,6 +26,7 @@ router.get('/', async (req, res) => {
         endpoints: {
           msg91: '/msg91',
           health: '/health',
+          mockAccounts: '/mock-accounts',
         },
       },
     });

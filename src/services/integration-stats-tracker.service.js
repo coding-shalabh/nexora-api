@@ -30,8 +30,7 @@ class IntegrationStatsTrackerService {
         return;
       }
 
-      const currentConfig = integration.config || {};
-      const currentStats = currentConfig.stats || {};
+      const currentStats = integration.stats || {};
       const updatedStats = {
         ...currentStats,
         sent: (currentStats.sent || 0) + 1,
@@ -46,10 +45,7 @@ class IntegrationStatsTrackerService {
       await prisma.integration.update({
         where: { id: integration.id },
         data: {
-          config: {
-            ...currentConfig,
-            stats: updatedStats,
-          },
+          stats: updatedStats,
         },
       });
 
@@ -84,8 +80,7 @@ class IntegrationStatsTrackerService {
         return;
       }
 
-      const currentConfig = integration.config || {};
-      const currentStats = currentConfig.stats || {};
+      const currentStats = integration.stats || {};
       const updatedStats = {
         ...currentStats,
         delivered: (currentStats.delivered || 0) + 1,
@@ -100,10 +95,7 @@ class IntegrationStatsTrackerService {
       await prisma.integration.update({
         where: { id: integration.id },
         data: {
-          config: {
-            ...currentConfig,
-            stats: updatedStats,
-          },
+          stats: updatedStats,
         },
       });
 
@@ -139,8 +131,7 @@ class IntegrationStatsTrackerService {
         return;
       }
 
-      const currentConfig = integration.config || {};
-      const currentStats = currentConfig.stats || {};
+      const currentStats = integration.stats || {};
       const updatedStats = {
         ...currentStats,
         failed: (currentStats.failed || 0) + 1,
@@ -155,10 +146,7 @@ class IntegrationStatsTrackerService {
       await prisma.integration.update({
         where: { id: integration.id },
         data: {
-          config: {
-            ...currentConfig,
-            stats: updatedStats,
-          },
+          stats: updatedStats,
         },
       });
 
@@ -203,7 +191,8 @@ class IntegrationStatsTrackerService {
           id: true,
           provider: true,
           name: true,
-          config: true, // Using config instead of stats temporarily
+          config: true,
+          stats: true, // Stats are stored in dedicated stats field
           type: true,
         },
       });
@@ -282,7 +271,8 @@ class IntegrationStatsTrackerService {
       };
 
       filteredIntegrations.forEach((integration) => {
-        const stats = integration.config?.stats || {};
+        // Stats are stored in dedicated stats field, fallback to config.stats for legacy data
+        const stats = integration.stats || integration.config?.stats || {};
         combined.sent += stats.sent || 0;
         combined.delivered += stats.delivered || 0;
         combined.failed += stats.failed || 0;

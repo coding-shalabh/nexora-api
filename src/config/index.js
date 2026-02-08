@@ -67,7 +67,9 @@ function loadConfig() {
     awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     s3BucketName: process.env.S3_BUCKET_NAME,
     sqsQueueUrl: process.env.SQS_QUEUE_URL,
-    corsOrigins: process.env.CORS_ORIGINS || 'http://localhost:3000',
+    corsOrigins:
+      process.env.CORS_ORIGINS ||
+      'http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010',
     msg91AuthKey: process.env.MSG91_AUTH_KEY,
     msg91SenderId: process.env.MSG91_SENDER_ID,
     rateLimitWindowMs: process.env.RATE_LIMIT_WINDOW_MS,

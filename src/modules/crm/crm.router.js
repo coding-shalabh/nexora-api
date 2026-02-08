@@ -195,6 +195,58 @@ router.get('/contacts', requirePermission('crm:contacts:read'), async (req, res,
   }
 });
 
+// Find duplicate contacts (MUST be before /contacts/:id to avoid route conflict)
+router.get(
+  '/contacts/duplicates',
+  requirePermission('crm:contacts:read'),
+  async (req, res, next) => {
+    try {
+      const paramsSchema = z.object({
+        matchBy: z.enum(['email', 'phone', 'name', 'all']).default('email'),
+        threshold: z.coerce.number().min(0).max(1).default(0.8),
+      });
+
+      const params = paramsSchema.parse(req.query);
+      const result = await crmService.findDuplicateContacts(req.tenantId, params);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// Merge two contacts
+router.post('/contacts/merge', requirePermission('crm:contacts:update'), async (req, res, next) => {
+  try {
+    const mergeSchema = z.object({
+      primaryId: z.string().min(1),
+      duplicateId: z.string().min(1),
+      fieldSelections: z.record(z.string(), z.enum(['primary', 'duplicate'])).optional(),
+    });
+
+    const data = mergeSchema.parse(req.body);
+    const result = await crmService.mergeContacts(
+      req.tenantId,
+      req.userId,
+      data.primaryId,
+      data.duplicateId,
+      data.fieldSelections || {}
+    );
+
+    res.json({
+      success: true,
+      data: result,
+      message: 'Contacts merged successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/contacts/:id', requirePermission('crm:contacts:read'), async (req, res, next) => {
   try {
     const contact = await crmService.getContact(req.tenantId, req.params.id);
@@ -1583,60 +1635,6 @@ router.patch(
   }
 );
 
-// ============ DUPLICATE DETECTION & MERGE ============
-
-// Find duplicate contacts
-router.get(
-  '/contacts/duplicates',
-  requirePermission('crm:contacts:read'),
-  async (req, res, next) => {
-    try {
-      const paramsSchema = z.object({
-        matchBy: z.enum(['email', 'phone', 'name', 'all']).default('email'),
-        threshold: z.coerce.number().min(0).max(1).default(0.8),
-      });
-
-      const params = paramsSchema.parse(req.query);
-      const result = await crmService.findDuplicateContacts(req.tenantId, params);
-
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
-  }
-);
-
-// Merge two contacts
-router.post('/contacts/merge', requirePermission('crm:contacts:update'), async (req, res, next) => {
-  try {
-    const mergeSchema = z.object({
-      primaryId: z.string().min(1),
-      duplicateId: z.string().min(1),
-      fieldSelections: z.record(z.string(), z.enum(['primary', 'duplicate'])).optional(),
-    });
-
-    const data = mergeSchema.parse(req.body);
-    const result = await crmService.mergeContacts(
-      req.tenantId,
-      req.userId,
-      data.primaryId,
-      data.duplicateId,
-      data.fieldSelections || {}
-    );
-
-    res.json({
-      success: true,
-      data: result,
-      message: 'Contacts merged successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
 // ============ CUSTOM FIELDS ============
 
 // Get all custom fields for an entity type
@@ -1818,26 +1816,34 @@ router.post(
 );
 
 // ================= NOTES =================
+// Notes are stored as Activity records with type='NOTE'
+// These endpoints provide a convenient alias for note-specific operations
 
 /**
  * Get notes for CRM entities
+ * Notes are Activities with type='NOTE' - this proxies to activities endpoint
  */
 router.get('/notes', requirePermission('crm:contacts:read'), async (req, res, next) => {
   try {
-    const tenantId = req.tenantId;
-    const { entityType, entityId, limit = 25, page = 1 } = req.query;
+    const { contactId, companyId, dealId, limit = 25, page = 1 } = req.query;
 
-    // TODO: Notes feature not yet fully implemented
-    // Return empty data with proper structure for now
+    // Notes are Activities with type='NOTE'
+    const params = {
+      type: 'NOTE',
+      page: parseInt(page),
+      limit: parseInt(limit),
+    };
+
+    if (contactId) params.contactId = contactId;
+    if (companyId) params.companyId = companyId;
+    if (dealId) params.dealId = dealId;
+
+    const result = await crmService.getActivities(req.tenantId, params);
+
     res.json({
       success: true,
-      data: [],
-      meta: {
-        total: 0,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: 0,
-      },
+      data: result.activities,
+      meta: result.meta,
     });
   } catch (error) {
     next(error);
@@ -1846,27 +1852,25 @@ router.get('/notes', requirePermission('crm:contacts:read'), async (req, res, ne
 
 /**
  * Create a note for CRM entity
+ * Creates an Activity record with type='NOTE'
  */
 router.post('/notes', requirePermission('crm:contacts:create'), async (req, res, next) => {
   try {
-    const tenantId = req.tenantId;
-    const { entityType, entityId, content } = req.body;
+    const { contactId, companyId, dealId, content, title } = req.body;
 
-    // TODO: Notes feature not yet fully implemented
-    // Return mock created note for now
-    const note = {
-      id: 'note_' + Date.now(),
-      entityType,
-      entityId,
-      content,
-      createdAt: new Date().toISOString(),
-      createdBy: req.userId,
-      tenantId,
-    };
+    // Create an activity with type='NOTE'
+    const activity = await crmService.createActivity(req.tenantId, req.userId, {
+      type: 'NOTE',
+      title: title || 'Note',
+      description: content,
+      contactId,
+      companyId,
+      dealId,
+    });
 
     res.status(201).json({
       success: true,
-      data: note,
+      data: activity,
       message: 'Note created successfully',
     });
   } catch (error) {

@@ -78,6 +78,19 @@ async function main() {
     create: { userId: platformAdmin.id, workspaceId: platformWorkspace.id },
   });
 
+  // Create platform admin role with all permissions
+  const platformAdminRole = await prisma.role.upsert({
+    where: { tenantId_name: { tenantId: platformTenant.id, name: 'Platform Admin' } },
+    update: {},
+    create: {
+      tenantId: platformTenant.id,
+      name: 'Platform Admin',
+      description: 'Full platform access with all permissions',
+      isSystem: true,
+    },
+  });
+  console.log('Created platform admin role');
+
   // ==================== TEST CUSTOMER TENANT ====================
   // Create tenant (Test Customer - simulating a business using Nexora CRM)
   const tenant = await prisma.tenant.upsert({
@@ -228,6 +241,23 @@ async function main() {
     });
   }
   console.log('Created admin role with permissions');
+
+  // Assign all permissions to platform admin role
+  for (const perm of permissions) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: platformAdminRole.id, permissionId: perm.id } },
+      update: {},
+      create: { roleId: platformAdminRole.id, permissionId: perm.id },
+    });
+  }
+
+  // Link platform admin to platform admin role
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: platformAdmin.id, roleId: platformAdminRole.id } },
+    update: {},
+    create: { userId: platformAdmin.id, roleId: platformAdminRole.id },
+  });
+  console.log('Assigned platform admin role to platform admin user');
 
   // Create user (Test Customer Admin)
   const passwordHash = await bcrypt.hash('Helixcodeinc@2005', 12);

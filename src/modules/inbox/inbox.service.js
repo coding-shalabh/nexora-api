@@ -150,11 +150,13 @@ class InboxService {
     // ========== SEARCH ==========
     if (filters.search) {
       where.OR = [
+        { contactName: { contains: filters.search, mode: 'insensitive' } },
+        { contactPhone: { contains: filters.search } },
+        { lastMessagePreview: { contains: filters.search, mode: 'insensitive' } },
         { contact: { firstName: { contains: filters.search, mode: 'insensitive' } } },
         { contact: { lastName: { contains: filters.search, mode: 'insensitive' } } },
         { contact: { phone: { contains: filters.search } } },
         { contact: { email: { contains: filters.search, mode: 'insensitive' } } },
-        { subject: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
 
@@ -860,6 +862,70 @@ class InboxService {
   }
 
   async markAsRead(tenantId, conversationId) {
+    // First try ConversationThread (new model with message_events)
+    const thread = await prisma.conversationThread.findFirst({
+      where: { id: conversationId, tenantId },
+    });
+
+    if (thread) {
+      // Get all unread inbound messages from message_events
+      const unreadMessages = await prisma.message_events.findMany({
+        where: {
+          threadId: conversationId,
+          tenantId,
+          direction: 'INBOUND',
+          readAt: null,
+        },
+        select: { id: true },
+      });
+
+      // Mark all unread messages as read
+      if (unreadMessages.length > 0) {
+        await prisma.message_events.updateMany({
+          where: {
+            threadId: conversationId,
+            tenantId,
+            direction: 'INBOUND',
+            readAt: null,
+          },
+          data: {
+            readAt: new Date(),
+          },
+        });
+
+        // Broadcast status update for each message via WebSocket
+        for (const msg of unreadMessages) {
+          try {
+            broadcastMessageStatus(tenantId, msg.id, conversationId, 'read');
+          } catch (wsError) {
+            logger.warn(
+              { error: wsError.message, messageId: msg.id },
+              'Failed to broadcast read status'
+            );
+          }
+        }
+
+        logger.info(
+          { conversationId, messageCount: unreadMessages.length },
+          'Marked messages as read (ConversationThread)'
+        );
+      }
+
+      // Update conversation thread: reset unread count and change status if needed
+      const updateData = { unreadCount: 0 };
+      if (thread.status === 'PENDING') {
+        updateData.status = 'OPEN';
+      }
+
+      await prisma.conversationThread.update({
+        where: { id: conversationId },
+        data: updateData,
+      });
+
+      return { success: true, messagesMarked: unreadMessages.length };
+    }
+
+    // Fall back to old Conversation model
     const conversation = await prisma.conversation.findFirst({
       where: { id: conversationId, tenantId },
     });
@@ -868,54 +934,10 @@ class InboxService {
       throw new NotFoundError('Conversation not found');
     }
 
-    // Get all unread inbound messages before updating
-    const unreadMessages = await prisma.conversationThread.findMany({
-      where: {
-        conversationId: conversationId,
-        direction: 'INBOUND',
-        readAt: null,
-      },
-      select: { id: true },
-    });
-
-    // Mark all unread messages as read
-    if (unreadMessages.length > 0) {
-      await prisma.conversationThread.updateMany({
-        where: {
-          conversationId: conversationId,
-          direction: 'INBOUND',
-          readAt: null,
-        },
-        data: {
-          readAt: new Date(),
-        },
-      });
-
-      // Broadcast status update for each message via WebSocket
-      for (const msg of unreadMessages) {
-        try {
-          broadcastMessageStatus(tenantId, msg.id, conversationId, 'read');
-        } catch (wsError) {
-          logger.warn(
-            { error: wsError.message, messageId: msg.id },
-            'Failed to broadcast read status'
-          );
-        }
-      }
-
-      logger.info(
-        { conversationId, messageCount: unreadMessages.length },
-        'Marked messages as read'
-      );
-    }
-
-    // Update conversation: reset unread count and change PENDING → OPEN
+    // For old Conversation model, just reset unread count
     const updateData = { unreadCount: 0 };
-
-    // If conversation is PENDING (not opened yet), change to OPEN when opened
     if (conversation.status === 'PENDING') {
       updateData.status = 'OPEN';
-      logger.info({ conversationId }, 'Conversation status changed from PENDING to OPEN');
     }
 
     await prisma.conversation.update({
@@ -923,7 +945,9 @@ class InboxService {
       data: updateData,
     });
 
-    return { success: true };
+    logger.info({ conversationId }, 'Marked conversation as read (Conversation)');
+
+    return { success: true, messagesMarked: 0 };
   }
 
   // ============ TEMPLATES ============
@@ -1290,6 +1314,227 @@ class InboxService {
 
     // If not found in ConversationThread, this conversation doesn't support purpose yet
     throw new NotFoundError('Conversation not found or does not support purpose classification');
+  }
+
+  // ============ ANALYTICS ============
+
+  /**
+   * Get inbox analytics for a date range
+   */
+  async getAnalytics(tenantId, dateFrom, dateTo) {
+    // Get conversation counts
+    const [totalConversations, resolvedConversations, messageStats] = await Promise.all([
+      prisma.conversation.count({
+        where: {
+          tenantId,
+          createdAt: { gte: dateFrom, lte: dateTo },
+        },
+      }),
+      prisma.conversation.count({
+        where: {
+          tenantId,
+          status: 'RESOLVED',
+          updatedAt: { gte: dateFrom, lte: dateTo },
+        },
+      }),
+      prisma.conversationThread.groupBy({
+        by: ['direction'],
+        where: {
+          tenantId,
+          createdAt: { gte: dateFrom, lte: dateTo },
+        },
+        _count: { id: true },
+      }),
+    ]);
+
+    // Get unique contacts count
+    const contacts = await prisma.conversation.findMany({
+      where: {
+        tenantId,
+        createdAt: { gte: dateFrom, lte: dateTo },
+      },
+      select: { contactId: true },
+      distinct: ['contactId'],
+    });
+
+    // Calculate average response time (mock for now)
+    const avgResponseTime = '2.0 min';
+
+    // Get channel breakdown
+    const channelStats = await prisma.conversation.groupBy({
+      by: ['channelId'],
+      where: {
+        tenantId,
+        createdAt: { gte: dateFrom, lte: dateTo },
+      },
+      _count: { id: true },
+    });
+
+    return {
+      conversations: totalConversations,
+      contacts: contacts.length,
+      resolved: resolvedConversations,
+      avgResponseTime,
+      messagesSent: messageStats.find((m) => m.direction === 'OUTBOUND')?._count?.id || 0,
+      messagesReceived: messageStats.find((m) => m.direction === 'INBOUND')?._count?.id || 0,
+      byChannel: channelStats,
+    };
+  }
+
+  // ============ NOTES ============
+
+  /**
+   * Get notes for a conversation
+   * Works with both Conversation (old) and ConversationThread (new) models
+   */
+  async getConversationNotes(tenantId, conversationId) {
+    // First try ConversationThread (new model with conversation_notes)
+    const thread = await prisma.conversationThread.findFirst({
+      where: { id: conversationId, tenantId },
+    });
+
+    if (thread) {
+      try {
+        // Get notes from conversation_notes table (use raw query as fallback if model not available)
+        if (prisma.conversationNote) {
+          const notes = await prisma.conversationNote.findMany({
+            where: {
+              threadId: conversationId,
+              tenantId,
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          // Fetch user details for each note
+          const userIds = [...new Set(notes.map((n) => n.userId))];
+          if (userIds.length > 0) {
+            const users = await prisma.user.findMany({
+              where: { id: { in: userIds } },
+              select: { id: true, name: true, email: true, avatarUrl: true },
+            });
+            const userMap = new Map(users.map((u) => [u.id, u]));
+
+            return notes.map((note) => ({
+              ...note,
+              createdBy: userMap.get(note.userId) || {
+                id: note.userId,
+                name: 'Unknown',
+                email: '',
+                avatarUrl: null,
+              },
+            }));
+          }
+          return notes;
+        }
+
+        // Fallback: query using raw SQL if model not available
+        const notes = await prisma.$queryRaw`
+          SELECT * FROM conversation_notes
+          WHERE "threadId" = ${conversationId} AND "tenantId" = ${tenantId}
+          ORDER BY "createdAt" DESC
+        `;
+        return notes || [];
+      } catch (error) {
+        logger.warn(
+          { error: error.message, conversationId },
+          'Failed to fetch notes, returning empty array'
+        );
+        return [];
+      }
+    }
+
+    // Fall back to old Conversation model
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, tenantId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    // For old Conversation model, return empty array (no notes support)
+    return [];
+  }
+
+  /**
+   * Add a note to a conversation
+   * Works with both Conversation (old) and ConversationThread (new) models
+   */
+  async addConversationNote(tenantId, conversationId, userId, content, isPrivate = false) {
+    // First try ConversationThread (new model with conversation_notes)
+    const thread = await prisma.conversationThread.findFirst({
+      where: { id: conversationId, tenantId },
+    });
+
+    if (thread) {
+      try {
+        let note;
+        const noteId = `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        if (prisma.conversationNote) {
+          // Create note using Prisma model
+          note = await prisma.conversationNote.create({
+            data: {
+              threadId: conversationId,
+              tenantId,
+              userId,
+              content,
+              isPinned: false,
+              mentions: [],
+            },
+          });
+        } else {
+          // Fallback: use raw SQL
+          const now = new Date();
+          await prisma.$executeRaw`
+            INSERT INTO conversation_notes ("id", "threadId", "tenantId", "userId", "content", "isPinned", "mentions", "createdAt", "updatedAt")
+            VALUES (${noteId}, ${conversationId}, ${tenantId}, ${userId}, ${content}, false, '{}', ${now}, ${now})
+          `;
+          note = {
+            id: noteId,
+            threadId: conversationId,
+            tenantId,
+            userId,
+            content,
+            isPinned: false,
+            mentions: [],
+            createdAt: now,
+            updatedAt: now,
+          };
+        }
+
+        // Fetch user details
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, name: true, email: true, avatarUrl: true },
+        });
+
+        logger.info(
+          { conversationId, noteId: note.id, userId },
+          'Note added to conversation thread'
+        );
+
+        return {
+          ...note,
+          createdBy: user || { id: userId, name: 'Unknown', email: '', avatarUrl: null },
+        };
+      } catch (error) {
+        logger.error({ error: error.message, conversationId, userId }, 'Failed to add note');
+        throw new Error('Failed to add note');
+      }
+    }
+
+    // Fall back to old Conversation model
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, tenantId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    // Old Conversation model doesn't support notes
+    throw new Error('Notes not supported for this conversation type');
   }
 }
 

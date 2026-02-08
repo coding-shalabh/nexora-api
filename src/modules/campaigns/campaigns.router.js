@@ -142,6 +142,14 @@ const updateCampaignSchema = z
     return normalized;
   });
 
+const addBroadcastSchema = z.object({
+  broadcastId: z.string().min(1, 'Broadcast ID is required'),
+});
+
+const addSequenceSchema = z.object({
+  sequenceId: z.string().min(1, 'Sequence ID is required'),
+});
+
 // Helper for validation
 const validate = (schema) => (req, res, next) => {
   try {
@@ -165,7 +173,7 @@ router.get('/', async (req, res) => {
     const result = await campaignService.list({
       tenantId,
       page: parseInt(page) || 1,
-      limit: parseInt(limit) || 20,
+      limit: Math.min(parseInt(limit) || 20, 100), // Cap at 100
       status,
       type,
       search,
@@ -244,7 +252,7 @@ router.get('/:id/activities', async (req, res) => {
       tenantId,
       campaignId,
       page: parseInt(page) || 1,
-      limit: parseInt(limit) || 50,
+      limit: Math.min(parseInt(limit) || 50, 100), // Cap at 100
       type,
     });
 
@@ -386,11 +394,11 @@ router.post('/:id/duplicate', async (req, res) => {
 });
 
 // POST /campaigns/:id/broadcasts - Add broadcast to campaign
-router.post('/:id/broadcasts', async (req, res) => {
+router.post('/:id/broadcasts', validate(addBroadcastSchema), async (req, res) => {
   try {
     const tenantId = req.tenantId;
     const campaignId = req.params.id;
-    const { broadcastId } = req.body;
+    const { broadcastId } = req.validatedBody;
 
     const campaign = await campaignService.addBroadcast({
       tenantId,
@@ -406,11 +414,11 @@ router.post('/:id/broadcasts', async (req, res) => {
 });
 
 // POST /campaigns/:id/sequences - Add sequence to campaign
-router.post('/:id/sequences', async (req, res) => {
+router.post('/:id/sequences', validate(addSequenceSchema), async (req, res) => {
   try {
     const tenantId = req.tenantId;
     const campaignId = req.params.id;
-    const { sequenceId } = req.body;
+    const { sequenceId } = req.validatedBody;
 
     const campaign = await campaignService.addSequence({
       tenantId,

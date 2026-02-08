@@ -6,6 +6,7 @@
 import { prisma } from '@crm360/database';
 import { logger } from '../../common/logger.js';
 import { whatsAppService } from '../../common/providers/whatsapp/whatsapp.service.js';
+import * as fast2smsService from '../../services/fast2sms.service.js';
 
 const MSG91_CONTROL_URL = 'https://control.msg91.com/api/v5';
 
@@ -380,16 +381,188 @@ class BroadcastService {
   }
 
   /**
-   * Send SMS broadcast (placeholder - implement with SMS provider)
+   * Send SMS broadcast via Fast2SMS or MSG91
    */
   async sendSmsBroadcast(broadcast, contacts) {
-    // TODO: Implement SMS sending via MSG91 SMS API
-    this.logger.info({ broadcastId: broadcast.id }, 'SMS broadcast - not implemented yet');
+    this.logger.info(
+      { broadcastId: broadcast.id, recipientCount: contacts.length },
+      'Starting SMS broadcast'
+    );
 
-    await prisma.broadcastRecipient.updateMany({
-      where: { broadcastId: broadcast.id },
-      data: { status: 'FAILED', errorMessage: 'SMS not implemented yet' },
+    // Get SMS channel account
+    const channelAccount = await prisma.channelAccount.findFirst({
+      where: {
+        tenantId: broadcast.tenantId,
+        type: 'SMS',
+        status: 'ACTIVE',
+      },
     });
+
+    if (!channelAccount) {
+      this.logger.error({ broadcastId: broadcast.id }, 'No active SMS channel found');
+      await prisma.broadcastRecipient.updateMany({
+        where: { broadcastId: broadcast.id },
+        data: { status: 'FAILED', errorMessage: 'No active SMS channel configured' },
+      });
+      throw new Error('No active SMS channel configured');
+    }
+
+    const apiKey = channelAccount.providerConfig?.apiKey;
+    if (!apiKey) {
+      throw new Error('SMS API key not configured');
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    // Process contacts in batches of 50 for bulk sending
+    const batchSize = 50;
+    for (let i = 0; i < contacts.length; i += batchSize) {
+      const batch = contacts.slice(i, i + batchSize);
+
+      // Filter contacts with valid phone numbers
+      const validContacts = batch.filter(
+        (c) => c.phone && fast2smsService.validatePhoneNumber(c.phone)
+      );
+
+      if (validContacts.length === 0) {
+        continue;
+      }
+
+      // For personalized messages, send individually
+      if (broadcast.content.includes('{') || broadcast.content.includes('{{')) {
+        // Send individually for variable substitution
+        for (const contact of validContacts) {
+          try {
+            const variables = this.buildVariables(contact);
+            const personalizedMessage = this.interpolateContent(broadcast.content, variables);
+
+            const result = await fast2smsService.sendQuickSMS({
+              phone: contact.phone,
+              message: personalizedMessage,
+              apiKey,
+            });
+
+            if (result.success) {
+              successCount++;
+              await prisma.broadcastRecipient.updateMany({
+                where: {
+                  broadcastId: broadcast.id,
+                  contactId: contact.id,
+                },
+                data: {
+                  status: 'SENT',
+                  sentAt: new Date(),
+                  providerMessageId: result.requestId || result.request_id,
+                },
+              });
+            } else {
+              failedCount++;
+              await prisma.broadcastRecipient.updateMany({
+                where: {
+                  broadcastId: broadcast.id,
+                  contactId: contact.id,
+                },
+                data: {
+                  status: 'FAILED',
+                  errorMessage: result.error || 'Failed to send SMS',
+                },
+              });
+            }
+          } catch (error) {
+            failedCount++;
+            this.logger.error(
+              { error: error.message, contactId: contact.id },
+              'SMS send failed for contact'
+            );
+            await prisma.broadcastRecipient.updateMany({
+              where: {
+                broadcastId: broadcast.id,
+                contactId: contact.id,
+              },
+              data: {
+                status: 'FAILED',
+                errorMessage: error.message,
+              },
+            });
+          }
+        }
+      } else {
+        // Bulk send for non-personalized messages
+        try {
+          const phones = validContacts.map((c) => c.phone);
+          const result = await fast2smsService.sendBulkSMS({
+            phones,
+            message: broadcast.content,
+            apiKey,
+          });
+
+          if (result.success) {
+            successCount += validContacts.length;
+            await prisma.broadcastRecipient.updateMany({
+              where: {
+                broadcastId: broadcast.id,
+                contactId: { in: validContacts.map((c) => c.id) },
+              },
+              data: {
+                status: 'SENT',
+                sentAt: new Date(),
+                providerMessageId: result.requestId || result.request_id,
+              },
+            });
+          } else {
+            failedCount += validContacts.length;
+            await prisma.broadcastRecipient.updateMany({
+              where: {
+                broadcastId: broadcast.id,
+                contactId: { in: validContacts.map((c) => c.id) },
+              },
+              data: {
+                status: 'FAILED',
+                errorMessage: result.error || 'Bulk SMS failed',
+              },
+            });
+          }
+        } catch (error) {
+          failedCount += validContacts.length;
+          this.logger.error({ error: error.message }, 'Bulk SMS send failed');
+          await prisma.broadcastRecipient.updateMany({
+            where: {
+              broadcastId: broadcast.id,
+              contactId: { in: validContacts.map((c) => c.id) },
+            },
+            data: {
+              status: 'FAILED',
+              errorMessage: error.message,
+            },
+          });
+        }
+      }
+
+      // Add small delay between batches to avoid rate limiting
+      if (i + batchSize < contacts.length) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    this.logger.info(
+      { broadcastId: broadcast.id, successCount, failedCount },
+      'SMS broadcast completed'
+    );
+
+    return { successCount, failedCount };
+  }
+
+  /**
+   * Interpolate content with contact variables
+   */
+  interpolateContent(content, variables) {
+    let result = content;
+    // Handle both {var} and {{var}} formats
+    Object.entries(variables).forEach(([key, value]) => {
+      result = result.replace(new RegExp(`\\{\\{?${key}\\}?\\}`, 'gi'), value || '');
+    });
+    return result;
   }
 
   /**

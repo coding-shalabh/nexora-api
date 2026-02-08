@@ -69,6 +69,9 @@ import { dashboardRouter } from './modules/dashboard/index.js';
 import { telecmiRouter } from './modules/telecmi/telecmi.router.js';
 import { oauthRouter } from './modules/oauth/oauth.router.js';
 import testRouter from './modules/test/test.router.js';
+import { hrRouter } from './modules/hr/index.js';
+import { commerceRouter } from './modules/commerce/index.js';
+import { salesRouter } from './modules/sales/index.js';
 import path from 'path';
 
 export async function createServer() {
@@ -86,9 +89,18 @@ export async function createServer() {
     'https://api.nexoraos.pro',
     'https://72orionx.com',
     'https://www.72orionx.com',
-    // Development
+    // Development - localhost ports 3000-3010
     'http://localhost:3000',
     'http://localhost:3001',
+    'http://localhost:3002',
+    'http://localhost:3003',
+    'http://localhost:3004',
+    'http://localhost:3005',
+    'http://localhost:3006',
+    'http://localhost:3007',
+    'http://localhost:3008',
+    'http://localhost:3009',
+    'http://localhost:3010',
     'http://localhost:4000',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
@@ -215,6 +227,9 @@ export async function createServer() {
   apiV1.use('/dashboard', tenantMiddleware, dashboardRouter);
   apiV1.use('/telecmi', tenantMiddleware, telecmiRouter);
   apiV1.use('/oauth', tenantMiddleware, oauthRouter);
+  apiV1.use('/hr', tenantMiddleware, hrRouter);
+  apiV1.use('/commerce', tenantMiddleware, commerceRouter);
+  apiV1.use('/sales', tenantMiddleware, salesRouter);
   apiV1.use('/test', testRouter);
 
   // SMS webhook (public - Fast2SMS delivery reports)

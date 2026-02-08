@@ -19,8 +19,12 @@ class AnalyticsService {
       select: { id: true, name: true },
     });
     const wonStageIds = stages.filter((s) => s.name.toLowerCase().includes('won')).map((s) => s.id);
-    const lostStageIds = stages.filter((s) => s.name.toLowerCase().includes('lost')).map((s) => s.id);
-    const openStageIds = stages.filter((s) => !wonStageIds.includes(s.id) && !lostStageIds.includes(s.id)).map((s) => s.id);
+    const lostStageIds = stages
+      .filter((s) => s.name.toLowerCase().includes('lost'))
+      .map((s) => s.id);
+    const openStageIds = stages
+      .filter((s) => !wonStageIds.includes(s.id) && !lostStageIds.includes(s.id))
+      .map((s) => s.id);
 
     const [
       contactsCount,
@@ -88,8 +92,12 @@ class AnalyticsService {
     });
 
     const wonStageIds = stages.filter((s) => s.name.toLowerCase().includes('won')).map((s) => s.id);
-    const lostStageIds = stages.filter((s) => s.name.toLowerCase().includes('lost')).map((s) => s.id);
-    const openStageIds = stages.filter((s) => !wonStageIds.includes(s.id) && !lostStageIds.includes(s.id)).map((s) => s.id);
+    const lostStageIds = stages
+      .filter((s) => s.name.toLowerCase().includes('lost'))
+      .map((s) => s.id);
+    const openStageIds = stages
+      .filter((s) => !wonStageIds.includes(s.id) && !lostStageIds.includes(s.id))
+      .map((s) => s.id);
 
     const [totalValue, dealsByStage, wonDeals, lostDeals] = await Promise.all([
       prisma.deal.aggregate({
@@ -119,9 +127,7 @@ class AnalyticsService {
       }),
     ]);
 
-    const winRate = wonDeals + lostDeals > 0
-      ? (wonDeals / (wonDeals + lostDeals)) * 100
-      : 0;
+    const winRate = wonDeals + lostDeals > 0 ? (wonDeals / (wonDeals + lostDeals)) * 100 : 0;
 
     return {
       totalValue: totalValue._sum.amount || 0,
@@ -140,12 +146,7 @@ class AnalyticsService {
   async getInboxMetrics(tenantId, params) {
     const { startDate, endDate } = this.getDateRange(params);
 
-    const [
-      totalConversations,
-      byChannel,
-      byStatus,
-      avgResponseTime,
-    ] = await Promise.all([
+    const [totalConversations, byChannel, byStatus, avgResponseTime] = await Promise.all([
       prisma.conversation.count({
         where: { tenantId, createdAt: { gte: startDate, lte: endDate } },
       }),
@@ -185,15 +186,13 @@ class AnalyticsService {
       where: { pipeline: { tenantId, type: 'TICKET' } },
       select: { id: true, name: true },
     });
-    const resolvedStageIds = stages.filter((s) =>
-      s.name.toLowerCase().includes('resolved') || s.name.toLowerCase().includes('closed')
-    ).map((s) => s.id);
+    const resolvedStageIds = stages
+      .filter(
+        (s) => s.name.toLowerCase().includes('resolved') || s.name.toLowerCase().includes('closed')
+      )
+      .map((s) => s.id);
 
-    const [
-      totalTickets,
-      byPriority,
-      resolvedCount,
-    ] = await Promise.all([
+    const [totalTickets, byPriority, resolvedCount] = await Promise.all([
       prisma.ticket.count({
         where: { tenantId, createdAt: { gte: startDate, lte: endDate } },
       }),
@@ -230,9 +229,11 @@ class AnalyticsService {
       select: { id: true, name: true },
     });
     const wonStageIds = stages.filter((s) => s.name.toLowerCase().includes('won')).map((s) => s.id);
-    const resolvedStageIds = stages.filter((s) =>
-      s.name.toLowerCase().includes('resolved') || s.name.toLowerCase().includes('closed')
-    ).map((s) => s.id);
+    const resolvedStageIds = stages
+      .filter(
+        (s) => s.name.toLowerCase().includes('resolved') || s.name.toLowerCase().includes('closed')
+      )
+      .map((s) => s.id);
 
     const [dealsByUser, conversationsByUser, ticketsByUser] = await Promise.all([
       prisma.deal.groupBy({
@@ -266,11 +267,13 @@ class AnalyticsService {
 
     // Get user names
     const userIds = [
-      ...new Set([
-        ...dealsByUser.map((d) => d.ownerId),
-        ...conversationsByUser.map((c) => c.assignedToId),
-        ...ticketsByUser.map((t) => t.assignedToId),
-      ].filter(Boolean)),
+      ...new Set(
+        [
+          ...dealsByUser.map((d) => d.ownerId),
+          ...conversationsByUser.map((c) => c.assignedToId),
+          ...ticketsByUser.map((t) => t.assignedToId),
+        ].filter(Boolean)
+      ),
     ];
 
     const users = await prisma.user.findMany({
@@ -352,13 +355,12 @@ class AnalyticsService {
       select: { completedAt: true, endDate: true },
     });
 
-    const onTimeCompleted = projectsWithDeadlines.filter(
-      (p) => p.completedAt <= p.endDate
-    ).length;
+    const onTimeCompleted = projectsWithDeadlines.filter((p) => p.completedAt <= p.endDate).length;
 
-    const onTimeRate = projectsWithDeadlines.length > 0
-      ? Math.round((onTimeCompleted / projectsWithDeadlines.length) * 100)
-      : 0;
+    const onTimeRate =
+      projectsWithDeadlines.length > 0
+        ? Math.round((onTimeCompleted / projectsWithDeadlines.length) * 100)
+        : 0;
 
     return {
       total: totalProjects,
@@ -456,57 +458,53 @@ class AnalyticsService {
     const where = { tenantId, date: { gte: startDate, lte: endDate } };
     if (params.projectId) where.projectId = params.projectId;
 
-    const [
-      totalEntries,
-      totalHours,
-      billableHours,
-      byProject,
-      byUser,
-      dailyTrend,
-    ] = await Promise.all([
-      prisma.timeEntry.count({ where }),
-      prisma.timeEntry.aggregate({
-        where,
-        _sum: { hours: true },
-      }),
-      prisma.timeEntry.aggregate({
-        where: { ...where, billable: true },
-        _sum: { hours: true },
-      }),
-      prisma.timeEntry.groupBy({
-        by: ['projectId'],
-        where,
-        _sum: { hours: true },
-        _count: true,
-      }),
-      prisma.timeEntry.groupBy({
-        by: ['userId'],
-        where,
-        _sum: { hours: true },
-        _count: true,
-      }),
-      // Get daily hours for the past week
-      this.getDailyTimeEntries(tenantId, params),
-    ]);
+    const [totalEntries, totalHours, billableHours, byProject, byUser, dailyTrend] =
+      await Promise.all([
+        prisma.timeEntry.count({ where }),
+        prisma.timeEntry.aggregate({
+          where,
+          _sum: { hours: true },
+        }),
+        prisma.timeEntry.aggregate({
+          where: { ...where, billable: true },
+          _sum: { hours: true },
+        }),
+        prisma.timeEntry.groupBy({
+          by: ['projectId'],
+          where,
+          _sum: { hours: true },
+          _count: true,
+        }),
+        prisma.timeEntry.groupBy({
+          by: ['userId'],
+          where,
+          _sum: { hours: true },
+          _count: true,
+        }),
+        // Get daily hours for the past week
+        this.getDailyTimeEntries(tenantId, params),
+      ]);
 
     // Get project names
     const projectIds = byProject.map((p) => p.projectId).filter(Boolean);
-    const projects = projectIds.length > 0
-      ? await prisma.project.findMany({
-          where: { id: { in: projectIds } },
-          select: { id: true, name: true, color: true },
-        })
-      : [];
+    const projects =
+      projectIds.length > 0
+        ? await prisma.project.findMany({
+            where: { id: { in: projectIds } },
+            select: { id: true, name: true, color: true },
+          })
+        : [];
     const projectMap = new Map(projects.map((p) => [p.id, p]));
 
     // Get user names
     const userIds = byUser.map((u) => u.userId);
-    const users = userIds.length > 0
-      ? await prisma.user.findMany({
-          where: { id: { in: userIds } },
-          select: { id: true, firstName: true, lastName: true },
-        })
-      : [];
+    const users =
+      userIds.length > 0
+        ? await prisma.user.findMany({
+            where: { id: { in: userIds } },
+            select: { id: true, firstName: true, lastName: true },
+          })
+        : [];
     const userMap = new Map(users.map((u) => [u.id, u]));
 
     return {
@@ -585,6 +583,250 @@ class AnalyticsService {
       tasks: taskMetrics,
       timeTracking: timeMetrics,
     };
+  }
+
+  // ==================== GOALS ====================
+
+  async getGoals(tenantId, params) {
+    const { page = 1, limit = 20, type, status } = params;
+    const skip = (page - 1) * limit;
+
+    const where = { tenantId };
+    if (type) where.type = type;
+    if (status) where.status = status;
+
+    const [goals, total] = await Promise.all([
+      prisma.analyticsGoal.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.analyticsGoal.count({ where }),
+    ]);
+
+    return {
+      data: goals,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getGoal(tenantId, goalId) {
+    const goal = await prisma.analyticsGoal.findFirst({
+      where: { id: goalId, tenantId },
+    });
+
+    if (!goal) {
+      throw new Error('Goal not found');
+    }
+
+    return goal;
+  }
+
+  async createGoal(tenantId, userId, data) {
+    const goal = await prisma.analyticsGoal.create({
+      data: {
+        tenantId,
+        createdBy: userId,
+        name: data.name,
+        type: data.type,
+        targetValue: data.targetValue,
+        currentValue: 0,
+        startDate: new Date(data.startDate),
+        endDate: new Date(data.endDate),
+        metric: data.metric,
+        description: data.description,
+        status: 'ACTIVE',
+      },
+    });
+
+    return goal;
+  }
+
+  async updateGoal(tenantId, goalId, data) {
+    const existing = await prisma.analyticsGoal.findFirst({
+      where: { id: goalId, tenantId },
+    });
+
+    if (!existing) {
+      throw new Error('Goal not found');
+    }
+
+    const goal = await prisma.analyticsGoal.update({
+      where: { id: goalId },
+      data: {
+        ...data,
+        startDate: data.startDate ? new Date(data.startDate) : existing.startDate,
+        endDate: data.endDate ? new Date(data.endDate) : existing.endDate,
+      },
+    });
+
+    return goal;
+  }
+
+  async deleteGoal(tenantId, goalId) {
+    const existing = await prisma.analyticsGoal.findFirst({
+      where: { id: goalId, tenantId },
+    });
+
+    if (!existing) {
+      throw new Error('Goal not found');
+    }
+
+    await prisma.analyticsGoal.delete({
+      where: { id: goalId },
+    });
+
+    return { success: true };
+  }
+
+  async bulkGoals(tenantId, userId, goals) {
+    const results = [];
+
+    for (const goalData of goals) {
+      if (goalData.id) {
+        // Update existing
+        const goal = await this.updateGoal(tenantId, goalData.id, goalData);
+        results.push({ action: 'updated', goal });
+      } else {
+        // Create new
+        const goal = await this.createGoal(tenantId, userId, goalData);
+        results.push({ action: 'created', goal });
+      }
+    }
+
+    return {
+      processed: results.length,
+      results,
+    };
+  }
+
+  // ==================== REPORTS ====================
+
+  async getReports(tenantId, params) {
+    const { page = 1, limit = 20, type } = params;
+    const skip = (page - 1) * limit;
+
+    const where = { tenantId };
+    if (type) where.type = type;
+
+    const [reports, total] = await Promise.all([
+      prisma.analyticsReport.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.analyticsReport.count({ where }),
+    ]);
+
+    return {
+      data: reports,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getReport(tenantId, reportId) {
+    const report = await prisma.analyticsReport.findFirst({
+      where: { id: reportId, tenantId },
+    });
+
+    if (!report) {
+      throw new Error('Report not found');
+    }
+
+    return report;
+  }
+
+  async createReport(tenantId, userId, data) {
+    const report = await prisma.analyticsReport.create({
+      data: {
+        tenantId,
+        createdBy: userId,
+        name: data.name,
+        type: data.type,
+        config: data.config || {},
+        schedule: data.schedule,
+        status: 'ACTIVE',
+      },
+    });
+
+    return report;
+  }
+
+  async runReport(tenantId, reportId, params) {
+    const report = await this.getReport(tenantId, reportId);
+    const { startDate, endDate } = params;
+
+    // Generate report data based on type
+    let reportData = {};
+
+    switch (report.type) {
+      case 'SALES':
+        reportData = await this.getDashboard(tenantId, { startDate, endDate });
+        break;
+      case 'MARKETING':
+        // Placeholder - can be expanded
+        reportData = { message: 'Marketing report generated' };
+        break;
+      case 'SUPPORT':
+        reportData = await this.getTicketMetrics(tenantId, { startDate, endDate });
+        break;
+      default:
+        reportData = { message: 'Custom report generated' };
+    }
+
+    // Log the run
+    await prisma.analyticsReport.update({
+      where: { id: reportId },
+      data: { lastRunAt: new Date() },
+    });
+
+    return {
+      report,
+      data: reportData,
+      generatedAt: new Date(),
+      period: { startDate, endDate },
+    };
+  }
+
+  async deleteReport(tenantId, reportId) {
+    const existing = await prisma.analyticsReport.findFirst({
+      where: { id: reportId, tenantId },
+    });
+
+    if (!existing) {
+      throw new Error('Report not found');
+    }
+
+    await prisma.analyticsReport.delete({
+      where: { id: reportId },
+    });
+
+    return { success: true };
+  }
+
+  async getScheduledReports(tenantId) {
+    const reports = await prisma.analyticsReport.findMany({
+      where: {
+        tenantId,
+        schedule: { not: null },
+        status: 'ACTIVE',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return reports;
   }
 }
 
