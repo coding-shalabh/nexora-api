@@ -47,7 +47,9 @@ router.get('/', async (req, res) => {
  */
 router.post('/seed-data', authenticate, async (req, res) => {
   try {
-    const { tenantId, userId } = req.tenant;
+    // Get tenant info from authenticated user
+    const tenantId = req.user?.tenantId || req.tenant?.tenantId;
+    const userId = req.user?.id || req.tenant?.userId;
 
     console.log('🌱 Starting comprehensive seed for tenant:', tenantId);
 
