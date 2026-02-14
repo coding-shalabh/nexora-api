@@ -6,13 +6,13 @@
 import { Router } from 'express';
 import { authenticate } from '../../common/middleware/authenticate.js';
 import { PrismaClient } from '@prisma/client';
-import mockAccountsRouter from './mock-accounts.router.js';
+// import mockAccountsRouter from './mock-accounts.router.js'; // Temporarily disabled - file doesn't exist
 
 const router = Router();
 const prisma = new PrismaClient();
 
 // Mount mock accounts router
-router.use('/mock-accounts', mockAccountsRouter);
+// router.use('/mock-accounts', mockAccountsRouter); // Temporarily disabled
 
 /**
  * Get test utilities status
