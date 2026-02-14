@@ -347,6 +347,91 @@ router.post('/logo', authenticate, authorize('settings:update'), async (req, res
 });
 
 /**
+ * Upload favicon specifically for organization branding
+ * POST /uploads/favicon
+ */
+router.post('/favicon', authenticate, authorize('settings:update'), async (req, res, next) => {
+  try {
+    const schema = z.object({
+      image: z.string().min(1, 'Image data is required'),
+    });
+
+    const { image } = schema.parse(req.body);
+    const tenantId = req.tenantId;
+
+    // Parse base64 image
+    const matches = image.match(/^data:image\/([a-zA-Z+]+);base64,(.+)$/);
+    if (!matches) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_IMAGE',
+        message: 'Invalid base64 image format',
+      });
+    }
+
+    const [, imageType, base64Data] = matches;
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Validate size (max 100KB for favicon)
+    const MAX_SIZE = 100 * 1024;
+    if (buffer.length > MAX_SIZE) {
+      return res.status(400).json({
+        success: false,
+        error: 'FILE_TOO_LARGE',
+        message: 'Favicon size must be less than 100KB',
+      });
+    }
+
+    // Validate type (ICO or PNG only)
+    const normalizedType = imageType.toLowerCase();
+    if (!['png', 'x-icon', 'vnd.microsoft.icon'].some((t) => normalizedType.includes(t))) {
+      return res.status(400).json({
+        success: false,
+        error: 'INVALID_TYPE',
+        message: 'Only ICO and PNG formats are allowed for favicon',
+      });
+    }
+
+    // Generate filename
+    const ext = normalizedType.includes('icon') ? 'ico' : 'png';
+    const uniqueId = crypto.randomBytes(4).toString('hex');
+    const finalFilename = `favicon_${tenantId}_${uniqueId}.${ext}`;
+
+    // Create favicons folder
+    const folderPath = path.join(UPLOADS_DIR, 'favicons');
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+    }
+
+    // Save file
+    const filePath = path.join(folderPath, finalFilename);
+    fs.writeFileSync(filePath, buffer);
+
+    // Generate URL
+    const baseUrl = process.env.API_URL || 'https://api.nexoraos.pro';
+    const faviconUrl = `${baseUrl}/uploads/favicons/${finalFilename}`;
+
+    res.status(201).json({
+      success: true,
+      data: {
+        url: faviconUrl,
+        filename: finalFilename,
+        size: buffer.length,
+      },
+    });
+  } catch (error) {
+    if (error.name === 'ZodError') {
+      return res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: error.errors[0]?.message || 'Invalid request data',
+      });
+    }
+    next(error);
+  }
+});
+
+/**
  * Delete an uploaded file
  * DELETE /uploads/:folder/:filename
  */

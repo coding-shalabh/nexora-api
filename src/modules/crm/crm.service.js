@@ -115,7 +115,7 @@ class CrmService {
     });
 
     if (!contact) {
-      throw new NotFoundError('Contact not found');
+      throw new NotFoundError('Contact');
     }
 
     // Transform tags from ContactTag[] to Tag[]
@@ -200,7 +200,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Contact not found');
+      throw new NotFoundError('Contact');
     }
 
     // Build update data - only include fields that exist in the schema
@@ -294,7 +294,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Contact not found');
+      throw new NotFoundError('Contact');
     }
 
     await prisma.contact.delete({
@@ -418,7 +418,7 @@ class CrmService {
         where: { id: ownerId, tenantId },
       });
       if (!owner) {
-        throw new NotFoundError('Owner not found');
+        throw new NotFoundError('Owner');
       }
     }
 
@@ -636,7 +636,7 @@ class CrmService {
     ]);
 
     if (!primaryContact || !duplicateContact) {
-      throw new NotFoundError('One or both contacts not found');
+      throw new NotFoundError('One or both contacts');
     }
 
     // Merge data based on field selections
@@ -821,7 +821,7 @@ class CrmService {
     });
 
     if (!contact) {
-      throw new NotFoundError('Contact not found');
+      throw new NotFoundError('Contact');
     }
 
     const [activities, conversations] = await Promise.all([
@@ -1076,7 +1076,7 @@ class CrmService {
     });
 
     if (!tag) {
-      throw new NotFoundError('Tag not found');
+      throw new NotFoundError('Tag');
     }
 
     return {
@@ -1119,7 +1119,7 @@ class CrmService {
     });
 
     if (!tag) {
-      throw new NotFoundError('Tag not found');
+      throw new NotFoundError('Tag');
     }
 
     // Check if new name conflicts with existing tag
@@ -1148,7 +1148,7 @@ class CrmService {
     });
 
     if (!tag) {
-      throw new NotFoundError('Tag not found');
+      throw new NotFoundError('Tag');
     }
 
     // Delete all tag associations first (using onDelete: Cascade will handle this, but explicit is safer)
@@ -1176,13 +1176,13 @@ class CrmService {
     }
 
     const [segments, total] = await Promise.all([
-      prisma.segment.findMany({
+      prisma.segments.findMany({
         where,
         skip: (filters.page - 1) * filters.limit,
         take: filters.limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.segment.count({ where }),
+      prisma.segments.count({ where }),
     ]);
 
     return {
@@ -1197,12 +1197,12 @@ class CrmService {
   }
 
   async getSegment(tenantId, segmentId) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
     if (!segment) {
-      throw new NotFoundError('Segment not found');
+      throw new NotFoundError('Segment');
     }
 
     return segment;
@@ -1217,7 +1217,7 @@ class CrmService {
       contactCount = data.contactIds.length;
     }
 
-    const segment = await prisma.segment.create({
+    const segment = await prisma.segments.create({
       data: {
         tenantId,
         name: data.name,
@@ -1238,12 +1238,12 @@ class CrmService {
   }
 
   async updateSegment(tenantId, segmentId, data) {
-    const existing = await prisma.segment.findFirst({
+    const existing = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
     if (!existing) {
-      throw new NotFoundError('Segment not found');
+      throw new NotFoundError('Segment');
     }
 
     // Recalculate contact count if conditions or contactIds changed
@@ -1254,7 +1254,7 @@ class CrmService {
       contactCount = data.contactIds.length;
     }
 
-    const segment = await prisma.segment.update({
+    const segment = await prisma.segments.update({
       where: { id: segmentId },
       data: {
         name: data.name,
@@ -1273,15 +1273,15 @@ class CrmService {
   }
 
   async deleteSegment(tenantId, segmentId) {
-    const existing = await prisma.segment.findFirst({
+    const existing = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
     if (!existing) {
-      throw new NotFoundError('Segment not found');
+      throw new NotFoundError('Segment');
     }
 
-    await prisma.segment.delete({
+    await prisma.segments.delete({
       where: { id: segmentId },
     });
 
@@ -1289,12 +1289,12 @@ class CrmService {
   }
 
   async getSegmentContacts(tenantId, segmentId, filters) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
     if (!segment) {
-      throw new NotFoundError('Segment not found');
+      throw new NotFoundError('Segment');
     }
 
     let where = { tenantId };
@@ -1341,12 +1341,12 @@ class CrmService {
   }
 
   async syncSegment(tenantId, segmentId) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
     if (!segment) {
-      throw new NotFoundError('Segment not found');
+      throw new NotFoundError('Segment');
     }
 
     if (segment.type !== 'DYNAMIC') {
@@ -1355,7 +1355,7 @@ class CrmService {
 
     const contactCount = await this.evaluateSegmentConditions(tenantId, segment.conditions);
 
-    const updated = await prisma.segment.update({
+    const updated = await prisma.segments.update({
       where: { id: segmentId },
       data: {
         contactCount,
@@ -1443,7 +1443,7 @@ class CrmService {
     });
 
     if (!company) {
-      throw new NotFoundError('Company not found');
+      throw new NotFoundError('Company');
     }
 
     return {
@@ -1460,7 +1460,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Company not found');
+      throw new NotFoundError('Company');
     }
 
     const company = await prisma.company.update({
@@ -1468,6 +1468,7 @@ class CrmService {
       data: {
         name: data.name,
         domain: data.domain,
+        description: data.description,
         industry: data.industry,
         employeeCount: data.size || data.employeeCount,
         address: data.address,
@@ -1491,7 +1492,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Company not found');
+      throw new NotFoundError('Company');
     }
 
     await prisma.company.delete({
@@ -1515,7 +1516,7 @@ class CrmService {
     });
 
     if (!activity) {
-      throw new NotFoundError('Activity not found');
+      throw new NotFoundError('Activity');
     }
 
     return activity;
@@ -1527,7 +1528,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Activity not found');
+      throw new NotFoundError('Activity');
     }
 
     // Handle completed toggle
@@ -1587,7 +1588,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Activity not found');
+      throw new NotFoundError('Activity');
     }
 
     await prisma.activity.delete({
@@ -1601,7 +1602,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Activity not found');
+      throw new NotFoundError('Activity');
     }
 
     const activity = await prisma.activity.update({
@@ -1677,7 +1678,7 @@ class CrmService {
     });
 
     if (!lead) {
-      throw new NotFoundError('Lead not found');
+      throw new NotFoundError('Lead');
     }
 
     return lead;
@@ -1719,7 +1720,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Lead not found');
+      throw new NotFoundError('Lead');
     }
 
     const lead = await prisma.lead.update({
@@ -1756,7 +1757,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Lead not found');
+      throw new NotFoundError('Lead');
     }
 
     await prisma.lead.delete({
@@ -1772,7 +1773,7 @@ class CrmService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Lead not found');
+      throw new NotFoundError('Lead');
     }
 
     const lead = await prisma.lead.update({
@@ -1804,7 +1805,7 @@ class CrmService {
     });
 
     if (!lead) {
-      throw new NotFoundError('Lead not found');
+      throw new NotFoundError('Lead');
     }
 
     if (lead.status === 'CONVERTED') {

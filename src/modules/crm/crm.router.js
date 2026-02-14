@@ -7,6 +7,8 @@ import { activityTrackingService } from './activity-tracking.service.js';
 import { automationService } from './automation.service.js';
 import { customFieldsService } from './custom-fields.service.js';
 import { pipelineService } from '../pipeline/pipeline.service.js';
+import { oauthService } from '../../services/oauth.service.js';
+import { calendarService } from '../../services/calendar.service.js';
 
 const router = Router();
 
@@ -741,6 +743,7 @@ router.patch(
       const updateCompanySchema = z.object({
         name: z.string().min(1).optional(),
         domain: z.string().optional(),
+        description: z.string().optional(),
         industry: z.string().optional(),
         size: z.string().optional(),
         address: z.string().optional(),
@@ -1814,6 +1817,154 @@ router.post(
     }
   }
 );
+
+// ================= MEETINGS =================
+
+/**
+ * Create a meeting with automatic calendar integration
+ * If user has connected Google/Microsoft/Zoom, creates real calendar event with meeting link
+ */
+router.post('/meetings', requirePermission('crm:activities:create'), async (req, res, next) => {
+  try {
+    const createMeetingSchema = z.object({
+      title: z.string().min(1),
+      description: z.string().optional(),
+      startTime: z.string().datetime(), // ISO 8601 format
+      endTime: z.string().datetime(), // ISO 8601 format
+      type: z.enum(['IN_PERSON', 'VIDEO_CALL', 'PHONE_CALL']).default('IN_PERSON'),
+      location: z.string().optional(),
+      attendees: z.array(z.string().email()).optional(),
+      contactId: z.string().optional(),
+      companyId: z.string().optional(),
+      dealId: z.string().optional(),
+      platform: z.enum(['google', 'microsoft', 'zoom']).optional(), // Only for VIDEO_CALL
+      timezone: z.string().default('UTC'),
+    });
+
+    const data = createMeetingSchema.parse(req.body);
+    const { id: userId } = req.user;
+
+    let meetingLink = data.location;
+    let calendarEventId = null;
+    let calendarPlatform = null;
+
+    // If it's a video call and user selected a platform, create calendar event
+    if (data.type === 'VIDEO_CALL' && data.platform) {
+      try {
+        // Get user's OAuth access token
+        const accessToken = await oauthService.getAccessToken(userId, data.platform);
+
+        // Create calendar event with meeting link
+        let calendarResult;
+        if (data.platform === 'google') {
+          calendarResult = await calendarService.createGoogleMeetEvent({
+            accessToken,
+            title: data.title,
+            description: data.description,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            attendees: data.attendees,
+            timezone: data.timezone,
+          });
+        } else if (data.platform === 'microsoft') {
+          calendarResult = await calendarService.createTeamsMeeting({
+            accessToken,
+            title: data.title,
+            description: data.description,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            attendees: data.attendees,
+            timezone: data.timezone,
+          });
+        } else if (data.platform === 'zoom') {
+          calendarResult = await calendarService.createZoomMeeting({
+            accessToken,
+            title: data.title,
+            description: data.description,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            attendees: data.attendees,
+            timezone: data.timezone,
+          });
+        }
+
+        meetingLink = calendarResult.meetingLink;
+        calendarEventId = calendarResult.eventId;
+        calendarPlatform = calendarResult.platform;
+      } catch (error) {
+        console.error('Calendar integration error:', error.message);
+        // Continue without calendar link if OAuth fails
+        // This allows fallback to manual link entry
+      }
+    }
+
+    // Store meeting in database as Activity
+    const activity = await crmService.createActivity(req.tenantId, userId, {
+      type: 'MEETING',
+      title: data.title,
+      description: data.description,
+      contactId: data.contactId,
+      companyId: data.companyId,
+      dealId: data.dealId,
+      dueAt: data.startTime,
+      metadata: {
+        meetingType: data.type,
+        location: meetingLink || data.location,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        attendees: data.attendees,
+        calendarEventId,
+        calendarPlatform,
+        timezone: data.timezone,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        ...activity,
+        meetingLink,
+        calendarEventId,
+        calendarPlatform,
+      },
+      message: meetingLink
+        ? `Meeting scheduled with ${calendarPlatform} link`
+        : 'Meeting scheduled',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Get all meetings
+ */
+router.get('/meetings', requirePermission('crm:activities:read'), async (req, res, next) => {
+  try {
+    const params = z
+      .object({
+        page: z.coerce.number().min(1).default(1),
+        limit: z.coerce.number().min(1).max(100).default(25),
+        contactId: z.string().optional(),
+        companyId: z.string().optional(),
+        dealId: z.string().optional(),
+      })
+      .parse(req.query);
+
+    const result = await crmService.getActivities(req.tenantId, {
+      ...params,
+      type: 'MEETING',
+    });
+
+    res.json({
+      success: true,
+      data: result.activities,
+      meta: result.meta,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ================= NOTES =================
 // Notes are stored as Activity records with type='NOTE'

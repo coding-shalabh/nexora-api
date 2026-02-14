@@ -1,53 +1,13 @@
-/**
- * Test Utilities Router
- * API endpoints for testing and debugging
- */
-
-import { Router } from 'express';
-import { authenticate } from '../../common/middleware/authenticate.js';
+import { Hono } from 'hono';
 import { PrismaClient } from '@prisma/client';
-import mockAccountsRouter from './mock-accounts.router.js';
 
-const router = Router();
+const app = new Hono();
 const prisma = new PrismaClient();
 
-// Mount mock accounts router
-router.use('/mock-accounts', mockAccountsRouter);
-
-/**
- * Get test utilities status
- * GET /api/v1/test
- */
-router.get('/', async (req, res) => {
+// POST /api/v1/test/seed-data - Populate dummy data
+app.post('/', async (c) => {
   try {
-    res.json({
-      success: true,
-      data: {
-        available: true,
-        message: 'Test utilities API is available',
-        endpoints: {
-          msg91: '/msg91',
-          health: '/health',
-          mockAccounts: '/mock-accounts',
-          seedData: '/seed-data',
-        },
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: { message: error.message },
-    });
-  }
-});
-
-/**
- * Populate dummy data
- * POST /api/v1/test/seed-data
- */
-router.post('/seed-data', authenticate, async (req, res) => {
-  try {
-    const { tenantId, userId } = req.tenant;
+    const { tenantId, userId } = c.get('tenant');
 
     console.log('🌱 Starting comprehensive seed for tenant:', tenantId);
 
@@ -327,7 +287,7 @@ router.post('/seed-data', authenticate, async (req, res) => {
       });
     }
 
-    res.json({
+    return c.json({
       success: true,
       message: 'Dummy data created successfully',
       data: {
@@ -341,33 +301,14 @@ router.post('/seed-data', authenticate, async (req, res) => {
     });
   } catch (error) {
     console.error('Seed error:', error);
-    res.status(500).json({
-      success: false,
-      error: { message: error.message },
-    });
-  }
-});
-
-/**
- * Health check endpoint
- * GET /api/v1/test/health
- */
-router.get('/health', async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      data: {
-        status: 'healthy',
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
+    return c.json(
+      {
+        success: false,
+        error: error.message,
       },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: { message: error.message },
-    });
+      500
+    );
   }
 });
 
-export default router;
+export default app;

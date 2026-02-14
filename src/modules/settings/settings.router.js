@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { settingsService } from './settings.service.js';
 import { authenticate, authorize } from '../../common/middleware/authenticate.js';
+import { oauthService } from '../../services/oauth.service.js';
 
 const router = Router();
 
@@ -1239,6 +1240,89 @@ router.patch('/signatures/:id/default', async (req, res, next) => {
     const { channel } = schema.parse(req.body);
     const signature = await settingsService.setDefaultSignature(tenantId, userId, id, channel);
     res.json({ success: true, data: signature });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// =====================
+// OAuth Connected Accounts
+// =====================
+
+/**
+ * Get user's connected accounts
+ */
+router.get('/connected-accounts', async (req, res, next) => {
+  try {
+    const { tenantId, id: userId } = req.user;
+    const accounts = await oauthService.getConnectedAccounts(tenantId, userId);
+    res.json({ data: accounts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * OAuth callback - Exchange authorization code for tokens
+ */
+router.post('/oauth/callback', async (req, res, next) => {
+  try {
+    const { tenantId, id: userId } = req.user;
+    const schema = z.object({
+      platform: z.enum(['google', 'microsoft', 'zoom']),
+      code: z.string(),
+      redirect_uri: z.string().url(),
+    });
+
+    const { platform, code, redirect_uri } = schema.parse(req.body);
+
+    const account = await oauthService.connectAccount(
+      tenantId,
+      userId,
+      platform,
+      code,
+      redirect_uri
+    );
+
+    res.json({ data: account });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Disconnect OAuth account
+ */
+router.delete('/connected-accounts/:platform', async (req, res, next) => {
+  try {
+    const { tenantId, id: userId } = req.user;
+    const { platform } = req.params;
+
+    await oauthService.disconnectAccount(tenantId, userId, platform);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Refresh OAuth token manually (usually auto-refreshed)
+ */
+router.post('/connected-accounts/:platform/refresh', async (req, res, next) => {
+  try {
+    const { id: userId } = req.user;
+    const { platform } = req.params;
+
+    const account = await prisma.connectedAccount.findUnique({
+      where: { userId_platform: { userId, platform } },
+    });
+
+    if (!account) {
+      return res.status(404).json({ error: `No ${platform} account connected` });
+    }
+
+    const newToken = await oauthService.refreshToken(account);
+    res.json({ success: true, message: 'Token refreshed successfully' });
   } catch (error) {
     next(error);
   }

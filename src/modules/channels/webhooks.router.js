@@ -338,6 +338,81 @@ async function processMsg91Webhook(channelAccount, payload, prisma, logger) {
     ? new Date(payload.ts) // ISO 8601 string
     : new Date();
 
+  // ===== AI ASSISTANT ROUTING =====
+  // Check if this WhatsApp number is linked to AI Assistant
+  if (customerNumber) {
+    const normalizedPhone = customerNumber.startsWith('+') ? customerNumber : `+${customerNumber}`;
+
+    const aiLink = await prisma.whatsAppAILink.findFirst({
+      where: {
+        whatsappNumber: normalizedPhone,
+        status: 'ACTIVE',
+        isActive: true,
+      },
+      include: {
+        user: {
+          include: {
+            tenant: true,
+          },
+        },
+      },
+    });
+
+    if (aiLink) {
+      // Route to AI Assistant service
+      logger.info(
+        { phone: normalizedPhone, userId: aiLink.userId, tenantId: aiLink.tenantId },
+        'Routing message to AI Assistant'
+      );
+
+      try {
+        const { AIAssistantService } = await import('../ai-assistant/ai-assistant.service.js');
+        const aiService = new AIAssistantService();
+
+        const messageText = payload.text || '';
+        await aiService.processQuery({
+          whatsappNumber: normalizedPhone,
+          messageContent: messageText,
+          externalId: msgUuid,
+          user: aiLink.user,
+          channelAccount,
+        });
+
+        logger.info({ phone: normalizedPhone }, 'AI Assistant processed successfully');
+      } catch (aiError) {
+        logger.error(
+          { error: aiError.message, phone: normalizedPhone },
+          'AI Assistant processing failed'
+        );
+        // Fallback: Continue with normal inbox processing if AI fails
+      }
+
+      return; // Exit early - do NOT create customer support conversation
+    }
+
+    // ===== UNLINKED USER - AI ASSISTANT CHATBOT =====
+    // User is not linked but sent a message - handle with automated responses
+    logger.info({ phone: normalizedPhone }, 'Unlinked user - routing to AI chatbot');
+
+    try {
+      const { LinkInitiationService } = await import('../ai-assistant/link-initiation.service.js');
+      const linkService = new LinkInitiationService();
+
+      const messageText = payload.text || '';
+      await linkService.handleUnlinkedUser(normalizedPhone, messageText, channelAccount);
+
+      logger.info({ phone: normalizedPhone }, 'AI chatbot response sent to unlinked user');
+      return; // Exit early - automated response sent, no inbox conversation needed
+    } catch (chatbotError) {
+      logger.error(
+        { error: chatbotError.message, phone: normalizedPhone },
+        'AI chatbot failed - falling back to inbox'
+      );
+      // Fallback: Continue with normal inbox processing if chatbot fails
+    }
+  }
+  // ===== END AI ASSISTANT ROUTING =====
+
   // If no customer number, try nested format (backward compatibility)
   if (!customerNumber && payload.messages) {
     const messages = payload.messages || [];

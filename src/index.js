@@ -4,6 +4,7 @@ import { createServer } from './server.js';
 import { logger } from './common/logger.js';
 import { config } from './config/index.js';
 import { initializeSocketIO } from './common/websocket/socket.service.js';
+import { initializeWorkers, shutdownWorkers } from './workers/index.js';
 import { prisma } from '@crm360/database';
 
 async function bootstrap() {
@@ -25,7 +26,11 @@ async function bootstrap() {
     initializeSocketIO(server);
     logger.info('WebSocket server initialized');
 
-    // 5. Now start listening - everything is ready
+    // 5. Initialize background workers
+    await initializeWorkers();
+    logger.info('Background workers initialized');
+
+    // 6. Now start listening - everything is ready
     await new Promise((resolve) => {
       server.listen(config.port, () => {
         logger.info(`API server running on port ${config.port}`);
@@ -41,6 +46,9 @@ async function bootstrap() {
 
       server.close(async () => {
         logger.info('HTTP server closed');
+        // Shutdown background workers
+        await shutdownWorkers();
+        logger.info('Background workers stopped');
         // Disconnect from database
         await prisma.$disconnect();
         logger.info('Database connection closed');
