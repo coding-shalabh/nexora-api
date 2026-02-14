@@ -3,7 +3,7 @@
  * Core orchestration for WhatsApp AI Assistant
  */
 
-import { prisma } from '@nexora/database';
+import { prisma } from '@crm360/database';
 import { IntentClassifierService } from './intent-classifier.service.js';
 import { ToolExecutorService } from './tool-executor.service.js';
 import { AIProviderService } from './ai-provider.service.js';

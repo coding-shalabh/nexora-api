@@ -3,7 +3,7 @@
  * Handles WhatsApp-initiated linking flow
  */
 
-import { prisma } from '@nexora/database';
+import { prisma } from '@crm360/database';
 import { logger } from '../../common/utils/logger.js';
 import crypto from 'crypto';
 

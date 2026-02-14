@@ -72,9 +72,9 @@ import testRouter from './modules/test/test.router.js';
 import { hrRouter } from './modules/hr/index.js';
 import { commerceRouter } from './modules/commerce/index.js';
 import { salesRouter } from './modules/sales/index.js';
-import aiAssistantRouter from './modules/ai-assistant/ai-assistant.router.js';
-import bookingRouter from './modules/booking/booking.router.js';
-import eSignatureRouter from './modules/e-signature/e-signature.router.js';
+// import aiAssistantRouter from './modules/ai-assistant/ai-assistant.router.js'; // Temporarily disabled - export issue
+// import bookingRouter from './modules/booking/booking.router.js'; // Temporarily disabled - needs refactoring to Express
+// import eSignatureRouter from './modules/e-signature/e-signature.router.js'; // Temporarily disabled - missing email utils
 import path from 'path';
 
 export async function createServer() {
@@ -167,7 +167,7 @@ export async function createServer() {
   apiV1.use('/test/msg91', msg91TestRouter); // MSG91 API testing (no auth for testing)
   apiV1.use('/webhooks', webhooksRouter); // Channel webhooks (public - MSG91/Exotel calls these)
   apiV1.use('/utils', utilsRouter); // Utility endpoints (link previews, etc.)
-  apiV1.use('/e-signature/sign', eSignatureRouter); // Public signing endpoints (no auth)
+  // apiV1.use('/e-signature/sign', eSignatureRouter); // Public signing endpoints (no auth) - Temporarily disabled
   apiV1.use('/email', tenantMiddleware, emailRouter); // Email main router (includes send, track, domains, aliases, drafts, bulk, mailbox)
 
   // WhatsApp webhook (public - MSG91 calls this)
@@ -234,9 +234,9 @@ export async function createServer() {
   apiV1.use('/hr', tenantMiddleware, hrRouter);
   apiV1.use('/commerce', tenantMiddleware, commerceRouter);
   apiV1.use('/sales', tenantMiddleware, salesRouter);
-  apiV1.use('/ai-assistant', tenantMiddleware, aiAssistantRouter);
-  apiV1.use('/e-signature/requests', tenantMiddleware, eSignatureRouter); // Protected signature request management
-  apiV1.use('/', bookingRouter); // Booking pages (mixed public/protected - handles auth internally)
+  // apiV1.use('/ai-assistant', tenantMiddleware, aiAssistantRouter); // Temporarily disabled - export issue
+  // apiV1.use('/e-signature/requests', tenantMiddleware, eSignatureRouter); // Protected signature request management - Temporarily disabled
+  // apiV1.use('/', bookingRouter); // Booking pages (mixed public/protected - handles auth internally) - Temporarily disabled
   apiV1.use('/test', testRouter);
 
   // SMS webhook (public - Fast2SMS delivery reports)

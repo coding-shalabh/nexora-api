@@ -3,7 +3,7 @@
  * Fetches data from various Nexora modules with permission checks
  */
 
-import { prisma } from '@nexora/database';
+import { prisma } from '@crm360/database';
 import { logger } from '../../common/utils/logger.js';
 
 export class DataFetcherService {

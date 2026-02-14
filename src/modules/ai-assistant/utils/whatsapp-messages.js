@@ -96,7 +96,7 @@ We'll be here when you're ready! 😊`;
 async function sendWhatsAppMessage(toNumber, message) {
   try {
     // Import WhatsApp service dynamically
-    const { prisma } = await import('@nexora/database');
+    const { prisma } = await import('@crm360/database');
 
     // Get the Nexora WhatsApp channel account
     const channelAccount = await prisma.channelAccount.findFirst({

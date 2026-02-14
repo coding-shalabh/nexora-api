@@ -4,7 +4,7 @@
  */
 
 import { Hono } from 'hono';
-import { prisma } from '@nexora/database';
+import { prisma } from '@crm360/database';
 import { logger } from '../../common/utils/logger.js';
 import { RateLimiterService } from './rate-limiter.service.js';
 import crypto from 'crypto';

@@ -5,7 +5,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { bookingService } from '../../services/booking.service.js';
-import { requireAuth, requirePermission } from '../../middleware/auth.middleware.js';
+import { authenticate } from '../../common/middleware/authenticate.js';
 
 const router = new Hono();
 

@@ -133,7 +133,7 @@ export class ToolExecutorService {
    * Create a report schedule
    */
   async createSchedule(userId, tenantId, { frequency, time, reportType }) {
-    const { prisma } = await import('@nexora/database');
+    const { prisma } = await import('@crm360/database');
 
     // Check if schedule already exists
     const existing = await prisma.aIAssistantSchedule.findFirst({

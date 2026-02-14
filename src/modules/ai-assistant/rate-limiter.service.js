@@ -3,7 +3,7 @@
  * Track usage and enforce rate limits
  */
 
-import { prisma } from '@nexora/database';
+import { prisma } from '@crm360/database';
 import { logger } from '../../common/utils/logger.js';
 
 const USER_DAILY_LIMIT = parseInt(process.env.AI_ASSISTANT_RATE_LIMIT_USER || '100');

@@ -3,7 +3,7 @@
  * Business logic for document signature requests
  */
 
-import { prisma } from '@nexora/database';
+import { prisma } from '@crm360/database';
 import { logger } from '../../common/utils/logger.js';
 import { PDFSignerService } from './pdf-signer.service.js';
 import crypto from 'crypto';
