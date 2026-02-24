@@ -60,7 +60,7 @@ export async function authenticate(req, res, next) {
       // Infer role level from role name
       let level = 1;
       if (roleName.includes('super') && roleName.includes('admin')) level = 10;
-      else if (roleName === 'admin' || roleName.includes('administrator')) level = 9;
+      else if (roleName.includes('admin')) level = 9;
       else if (roleName.includes('manager')) level = 8;
       else if (roleName.includes('marketing')) level = 7;
       else if (roleName.includes('sales')) level = 6;
@@ -80,9 +80,18 @@ export async function authenticate(req, res, next) {
     if (maxRoleLevel >= 9) {
       permissions.add('*'); // Full access for Admin and Super Admin
     } else if (maxRoleLevel >= 7) {
-      ['crm:*', 'analytics:read', 'inbox:*', 'pipeline:*', 'settings:read'].forEach(p => permissions.add(p));
+      ['crm:*', 'analytics:read', 'inbox:*', 'pipeline:*', 'settings:read'].forEach((p) =>
+        permissions.add(p)
+      );
     } else if (maxRoleLevel >= 5) {
-      ['crm:contacts:*', 'crm:deals:*', 'crm:activities:*', 'inbox:*', 'tickets:*', 'analytics:read'].forEach(p => permissions.add(p));
+      [
+        'crm:contacts:*',
+        'crm:deals:*',
+        'crm:activities:*',
+        'inbox:*',
+        'tickets:*',
+        'analytics:read',
+      ].forEach((p) => permissions.add(p));
     }
 
     // Attach user context to request
@@ -119,10 +128,9 @@ export function authorize(...permissions) {
       const hasPermission = permissions.some((p) => userPermissions.includes(p));
 
       if (!hasPermission) {
-        // Log for debugging
-        console.log('[Authorize] User permissions:', userPermissions);
-        console.log('[Authorize] Required permissions (any of):', permissions);
-        return next(new ForbiddenError(`Insufficient permissions. Required: ${permissions.join(' or ')}`));
+        return next(
+          new ForbiddenError(`Insufficient permissions. Required: ${permissions.join(' or ')}`)
+        );
       }
 
       next();

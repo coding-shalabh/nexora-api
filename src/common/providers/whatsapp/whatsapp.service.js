@@ -4,25 +4,57 @@
  * Supports both BYOK (Bring Your Own Key) and Managed (Reseller) modes
  */
 
-import { prisma } from '@crm360/database'
-import { logger } from '../../logger.js'
+import { prisma } from '@crm360/database';
+import { logger } from '../../logger.js';
 
-const MSG91_CONTROL_URL = 'https://control.msg91.com/api/v5'
+const MSG91_CONTROL_URL = 'https://control.msg91.com/api/v5';
 
 class WhatsAppService {
   constructor() {
-    this.logger = logger.child({ service: 'WhatsAppService' })
+    this.logger = logger.child({ service: 'WhatsAppService' });
   }
 
   /**
-   * Get headers for MSG91 API
+   * Get base URL for API calls — supports API Dog / Postman mock server routing
+   * If the channel account uses a POSTMAN provider, route to mock server
    */
-  getHeaders(authKey) {
-    return {
-      'authkey': authKey,
-      'Content-Type': 'application/json',
-      'accept': 'application/json',
+  getBaseUrl(account) {
+    // API Dog provider — route via account's configured base URL
+    if (account?.provider === 'APIDOG' && account?.providerConfig?.baseUrl) {
+      return account.providerConfig.baseUrl + '/api/v5';
     }
+    return MSG91_CONTROL_URL;
+  }
+
+  /**
+   * Check if a given account or the global config uses a mock provider
+   */
+  isApidogProvider(account) {
+    return account?.provider === 'APIDOG';
+  }
+
+  /**
+   * Get the mock token (API Dog auth) from account config or environment
+   */
+  getProviderToken(account) {
+    return account?.providerConfig?.apiToken || '';
+  }
+
+  /**
+   * Get headers for MSG91 API — adds API Dog token when using mock
+   */
+  getHeaders(authKey, account) {
+    const headers = {
+      authkey: authKey,
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+    };
+    // API Dog provider — add auth token as header
+    if (this.isApidogProvider(account)) {
+      const token = this.getProviderToken(account);
+      if (token) headers.apidogToken = token;
+    }
+    return headers;
   }
 
   // =====================
@@ -35,15 +67,15 @@ class WhatsAppService {
    */
   async connectBYOK({ tenantId, name, msg91AuthKey }) {
     // Validate the API key by fetching integrated numbers
-    const numbers = await this.getIntegratedNumbers(msg91AuthKey)
+    const numbers = await this.getIntegratedNumbers(msg91AuthKey);
 
     if (!numbers.success || !numbers.data?.length) {
-      throw new Error('Invalid MSG91 API key or no WhatsApp numbers integrated')
+      throw new Error('Invalid MSG91 API key or no WhatsApp numbers integrated');
     }
 
-    const primaryNumber = numbers.data[0]
+    const primaryNumber = numbers.data[0];
     // MSG91 returns integrated_number or number depending on the endpoint
-    const phoneNum = primaryNumber.integrated_number || primaryNumber.number
+    const phoneNum = primaryNumber.integrated_number || primaryNumber.number;
 
     // Create channel account
     const channelAccount = await prisma.channelAccount.create({
@@ -65,15 +97,18 @@ class WhatsAppService {
         healthStatus: 'HEALTHY',
         lastHealthCheck: new Date(),
       },
-    })
+    });
 
-    this.logger.info({ tenantId, channelAccountId: channelAccount.id }, 'WhatsApp BYOK channel connected')
+    this.logger.info(
+      { tenantId, channelAccountId: channelAccount.id },
+      'WhatsApp BYOK channel connected'
+    );
 
     return {
       success: true,
       channelAccount,
       integratedNumbers: numbers.data,
-    }
+    };
   }
 
   /**
@@ -81,10 +116,10 @@ class WhatsAppService {
    * Company uses Nexora's MSG91 account
    */
   async connectManaged({ tenantId, name, phoneNumber }) {
-    const nexoraAuthKey = process.env.MSG91_AUTH_KEY
+    const nexoraAuthKey = process.env.MSG91_AUTH_KEY;
 
     if (!nexoraAuthKey) {
-      throw new Error('Nexora MSG91 auth key not configured')
+      throw new Error('Nexora MSG91 auth key not configured');
     }
 
     // For managed mode, we use Nexora's MSG91 account
@@ -109,14 +144,48 @@ class WhatsAppService {
         healthStatus: 'HEALTHY',
         lastHealthCheck: new Date(),
       },
-    })
+    });
 
-    this.logger.info({ tenantId, channelAccountId: channelAccount.id }, 'WhatsApp Managed channel connected')
+    this.logger.info(
+      { tenantId, channelAccountId: channelAccount.id },
+      'WhatsApp Managed channel connected'
+    );
 
     return {
       success: true,
       channelAccount,
+    };
+  }
+
+  /**
+   * Get full account context: authKey, baseUrl, integratedNumber
+   * Single DB lookup that provides everything needed for API calls
+   */
+  async getAccountContext(channelAccountId) {
+    const account = await prisma.channelAccount.findUnique({
+      where: { id: channelAccountId },
+    });
+
+    if (!account) {
+      throw new Error('Channel account not found');
     }
+
+    // APIDOG accounts use their own token via apidogToken header — MSG91 authKey not required
+    const isApidog = this.isApidogProvider(account);
+    const authKey =
+      account.msg91AuthKey || account.providerConfig?.msg91AuthKey || process.env.MSG91_AUTH_KEY;
+
+    if (!authKey && !isApidog) {
+      this.logger.error({ channelAccountId }, 'No MSG91 auth key found for channel account');
+      throw new Error('MSG91 auth key not configured for this channel');
+    }
+
+    return {
+      account,
+      authKey,
+      baseUrl: this.getBaseUrl(account),
+      integratedNumber: account.providerConfig?.integratedNumber || account.phoneNumber,
+    };
   }
 
   /**
@@ -124,43 +193,16 @@ class WhatsAppService {
    * Checks multiple locations: direct field, providerConfig, and env fallback
    */
   async getAuthKey(channelAccountId) {
-    const account = await prisma.channelAccount.findUnique({
-      where: { id: channelAccountId },
-    })
-
-    if (!account) {
-      throw new Error('Channel account not found')
-    }
-
-    // Priority order for auth key:
-    // 1. Direct msg91AuthKey field on account (from Self-Service/configureWhatsApp)
-    // 2. providerConfig.msg91AuthKey (from BYOK/connectBYOK)
-    // 3. Environment variable (for Managed mode)
-    const authKey = account.msg91AuthKey
-      || account.providerConfig?.msg91AuthKey
-      || process.env.MSG91_AUTH_KEY
-
-    if (!authKey) {
-      this.logger.error({ channelAccountId }, 'No MSG91 auth key found for channel account')
-      throw new Error('MSG91 auth key not configured for this channel')
-    }
-
-    return authKey
+    const { authKey } = await this.getAccountContext(channelAccountId);
+    return authKey;
   }
 
   /**
    * Get the integrated number for a channel account
    */
   async getIntegratedNumber(channelAccountId) {
-    const account = await prisma.channelAccount.findUnique({
-      where: { id: channelAccountId },
-    })
-
-    if (!account) {
-      throw new Error('Channel account not found')
-    }
-
-    return account.providerConfig?.integratedNumber || account.phoneNumber
+    const { integratedNumber } = await this.getAccountContext(channelAccountId);
+    return integratedNumber;
   }
 
   // =====================
@@ -172,24 +214,25 @@ class WhatsAppService {
    */
   async getIntegratedNumbers(authKey) {
     try {
-      const response = await fetch(`${MSG91_CONTROL_URL}/whatsapp/whatsapp-activation/`, {
+      const baseUrl = this.getBaseUrl(null);
+      const response = await fetch(`${baseUrl}/whatsapp/whatsapp-activation/`, {
         method: 'GET',
         headers: this.getHeaders(authKey),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        return { success: false, error: data.message || 'Failed to fetch numbers' }
+        return { success: false, error: data.message || 'Failed to fetch numbers' };
       }
 
       return {
         success: true,
         data: data.data || data,
-      }
+      };
     } catch (error) {
-      this.logger.error({ error }, 'Failed to get integrated numbers')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Failed to get integrated numbers');
+      return { success: false, error: error.message };
     }
   }
 
@@ -198,15 +241,16 @@ class WhatsAppService {
    */
   async getBalance(authKey) {
     try {
-      const response = await fetch(`${MSG91_CONTROL_URL}/user/balance/`, {
+      const baseUrl = this.getBaseUrl(null);
+      const response = await fetch(`${baseUrl}/user/balance/`, {
         method: 'GET',
         headers: this.getHeaders(authKey),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        return { success: false, error: data.message || 'Failed to fetch balance' }
+        return { success: false, error: data.message || 'Failed to fetch balance' };
       }
 
       // MSG91 returns balance in the response
@@ -214,10 +258,10 @@ class WhatsAppService {
         success: true,
         balance: data.balance || data.data?.balance || 0,
         currency: data.currency || 'INR',
-      }
+      };
     } catch (error) {
-      this.logger.error({ error }, 'Failed to get MSG91 balance')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Failed to get MSG91 balance');
+      return { success: false, error: error.message };
     }
   }
 
@@ -226,19 +270,20 @@ class WhatsAppService {
    */
   async getTemplates(authKey, phoneNumber) {
     try {
-      const response = await fetch(`${MSG91_CONTROL_URL}/whatsapp/get-template-client/${phoneNumber}`, {
+      const baseUrl = this.getBaseUrl(null);
+      const response = await fetch(`${baseUrl}/whatsapp/get-template-client/${phoneNumber}`, {
         method: 'GET',
         headers: this.getHeaders(authKey),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        return { success: false, error: data.message || 'Failed to fetch templates' }
+        return { success: false, error: data.message || 'Failed to fetch templates' };
       }
 
       // Filter to only approved templates
-      const templates = (data.data || data || []).map(t => ({
+      const templates = (data.data || data || []).map((t) => ({
         id: t.id,
         name: t.name,
         category: t.category,
@@ -246,38 +291,44 @@ class WhatsAppService {
         language: t.languages?.[0]?.language || 'en',
         components: t.languages?.[0]?.code || t.components,
         variables: t.languages?.[0]?.variables || [],
-      }))
+      }));
 
       return {
         success: true,
         templates,
-        approvedTemplates: templates.filter(t => t.status === 'APPROVED'),
-      }
+        approvedTemplates: templates.filter((t) => t.status === 'APPROVED'),
+      };
     } catch (error) {
-      this.logger.error({ error }, 'Failed to get templates')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Failed to get templates');
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * Send WhatsApp template message
    */
-  async sendTemplate({ channelAccountId, recipient, templateName, languageCode = 'en', components = {} }) {
-    const authKey = await this.getAuthKey(channelAccountId)
-    const integratedNumber = await this.getIntegratedNumber(channelAccountId)
-    const recipientNumber = recipient.startsWith('+') ? recipient.slice(1) : recipient
+  async sendTemplate({
+    channelAccountId,
+    recipient,
+    templateName,
+    languageCode = 'en',
+    components = {},
+  }) {
+    const { account, authKey, baseUrl, integratedNumber } =
+      await this.getAccountContext(channelAccountId);
+    const recipientNumber = recipient.startsWith('+') ? recipient.slice(1) : recipient;
 
     // Build components object for to_and_components (MSG91 format)
-    const templateComponents = {}
+    const templateComponents = {};
     if (components.header) {
       templateComponents.header = Array.isArray(components.header)
-        ? components.header.map(v => ({ type: 'text', text: v }))
-        : [{ type: 'text', text: components.header }]
+        ? components.header.map((v) => ({ type: 'text', text: v }))
+        : [{ type: 'text', text: components.header }];
     }
     if (components.body) {
       templateComponents.body = Array.isArray(components.body)
-        ? components.body.map(v => ({ type: 'text', text: v }))
-        : [{ type: 'text', text: components.body }]
+        ? components.body.map((v) => ({ type: 'text', text: v }))
+        : [{ type: 'text', text: components.body }];
     }
 
     const payload = {
@@ -291,39 +342,44 @@ class WhatsAppService {
             code: languageCode,
             policy: 'deterministic',
           },
-          to_and_components: [{
-            to: [recipientNumber],
-            components: templateComponents,
-          }],
+          to_and_components: [
+            {
+              to: [recipientNumber],
+              components: templateComponents,
+            },
+          ],
         },
         messaging_product: 'whatsapp',
       },
-    }
+    };
 
     try {
-      const response = await fetch(`${MSG91_CONTROL_URL}/whatsapp/whatsapp-outbound-message/bulk/`, {
+      const response = await fetch(`${baseUrl}/whatsapp/whatsapp-outbound-message/bulk/`, {
         method: 'POST',
-        headers: this.getHeaders(authKey),
+        headers: this.getHeaders(authKey, account),
         body: JSON.stringify(payload),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        this.logger.error({ payload, response: data }, 'Failed to send template')
-        return { success: false, error: data.message || 'Failed to send message' }
+        this.logger.error({ payload, response: data }, 'Failed to send template');
+        return { success: false, error: data.message || 'Failed to send message' };
       }
 
-      this.logger.info({ recipient, templateName, messageId: data.data?.id }, 'WhatsApp template sent')
+      this.logger.info(
+        { recipient, templateName, messageId: data.data?.id },
+        'WhatsApp template sent'
+      );
 
       return {
         success: true,
         messageId: data.data?.id || data.id,
         data,
-      }
+      };
     } catch (error) {
-      this.logger.error({ error }, 'Failed to send template message')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Failed to send template message');
+      return { success: false, error: error.message };
     }
   }
 
@@ -332,19 +388,24 @@ class WhatsAppService {
    * Uses the single message endpoint for session replies
    */
   async sendText({ channelAccountId, recipient, text }) {
-    const authKey = await this.getAuthKey(channelAccountId)
-    const integratedNumber = await this.getIntegratedNumber(channelAccountId)
+    const { account, authKey, baseUrl, integratedNumber } =
+      await this.getAccountContext(channelAccountId);
     // Remove + prefix if present for MSG91
-    const recipientNumber = recipient.startsWith('+') ? recipient.slice(1) : recipient
+    const recipientNumber = recipient.startsWith('+') ? recipient.slice(1) : recipient;
     // Also remove + from integrated number
-    const senderNumber = integratedNumber.startsWith('+') ? integratedNumber.slice(1) : integratedNumber
+    const senderNumber = integratedNumber.startsWith('+')
+      ? integratedNumber.slice(1)
+      : integratedNumber;
 
-    this.logger.info({
-      channelAccountId,
-      integratedNumber: senderNumber,
-      recipient: recipientNumber,
-      hasAuthKey: !!authKey,
-    }, 'Preparing to send WhatsApp text')
+    this.logger.info(
+      {
+        channelAccountId,
+        integratedNumber: senderNumber,
+        recipient: recipientNumber,
+        hasAuthKey: !!authKey,
+      },
+      'Preparing to send WhatsApp text'
+    );
 
     // Use the single message endpoint for session messages (not bulk)
     // MSG91 endpoint: POST /api/v5/whatsapp/whatsapp-outbound-message/
@@ -355,46 +416,69 @@ class WhatsAppService {
       content_type: 'text',
       recipient_number: recipientNumber,
       text: text,
-    }
+    };
 
     try {
       // Use the single message endpoint (without /bulk/)
-      const url = `${MSG91_CONTROL_URL}/whatsapp/whatsapp-outbound-message/`
-      this.logger.info({ url, payload }, 'Sending to MSG91 (single message)')
+      const url = `${baseUrl}/whatsapp/whatsapp-outbound-message/`;
+      this.logger.info({ url, payload }, 'Sending to MSG91 (single message)');
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: this.getHeaders(authKey),
+        headers: this.getHeaders(authKey, account),
         body: JSON.stringify(payload),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
-      this.logger.info({
-        status: response.status,
-        ok: response.ok,
-        response: data,
-      }, 'MSG91 response received')
+      this.logger.info(
+        {
+          status: response.status,
+          ok: response.ok,
+          response: data,
+        },
+        'MSG91 response received'
+      );
 
       // Check for errors
-      if (!response.ok || data.type === 'error' || data.status === 'error' || data.status === 'fail' || data.hasError) {
-        this.logger.error({ response: data, status: response.status }, 'MSG91 API error')
-        return { success: false, error: data.message || data.errors || data.error || 'Failed to send message' }
+      if (
+        !response.ok ||
+        data.type === 'error' ||
+        data.status === 'error' ||
+        data.status === 'fail' ||
+        data.hasError
+      ) {
+        this.logger.error({ response: data, status: response.status }, 'MSG91 API error');
+        return {
+          success: false,
+          error: data.message || data.errors || data.error || 'Failed to send message',
+        };
       }
 
       // MSG91 returns message_uuid in data.data for successful messages
       // This ID will match the requestId in webhook delivery reports
-      const messageId = data.request_id || data.data?.message_uuid || data.data?.id || data.id || data.messages?.[0]?.id
-      this.logger.info({ recipient, messageId, rawResponse: data }, 'WhatsApp text sent successfully')
+      const messageId =
+        data.request_id ||
+        data.data?.message_uuid ||
+        data.data?.id ||
+        data.id ||
+        data.messages?.[0]?.id;
+      this.logger.info(
+        { recipient, messageId, rawResponse: data },
+        'WhatsApp text sent successfully'
+      );
 
       return {
         success: true,
         messageId,
         data,
-      }
+      };
     } catch (error) {
-      this.logger.error({ error: error.message, stack: error.stack }, 'Failed to send text message')
-      return { success: false, error: error.message }
+      this.logger.error(
+        { error: error.message, stack: error.stack },
+        'Failed to send text message'
+      );
+      return { success: false, error: error.message };
     }
   }
 
@@ -402,9 +486,9 @@ class WhatsAppService {
    * Send WhatsApp media message
    */
   async sendMedia({ channelAccountId, recipient, mediaType, mediaUrl, caption }) {
-    const authKey = await this.getAuthKey(channelAccountId)
-    const integratedNumber = await this.getIntegratedNumber(channelAccountId)
-    const recipientNumber = recipient.startsWith('+') ? recipient.slice(1) : recipient
+    const { account, authKey, baseUrl, integratedNumber } =
+      await this.getAccountContext(channelAccountId);
+    const recipientNumber = recipient.startsWith('+') ? recipient.slice(1) : recipient;
 
     const payload = {
       integrated_number: integratedNumber,
@@ -417,31 +501,31 @@ class WhatsAppService {
           ...(caption && { caption }),
         },
       },
-    }
+    };
 
     try {
-      const response = await fetch(`${MSG91_CONTROL_URL}/whatsapp/whatsapp-outbound-message/bulk/`, {
+      const response = await fetch(`${baseUrl}/whatsapp/whatsapp-outbound-message/bulk/`, {
         method: 'POST',
-        headers: this.getHeaders(authKey),
+        headers: this.getHeaders(authKey, account),
         body: JSON.stringify(payload),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        return { success: false, error: data.message || 'Failed to send media' }
+        return { success: false, error: data.message || 'Failed to send media' };
       }
 
-      this.logger.info({ recipient, mediaType, messageId: data.data?.id }, 'WhatsApp media sent')
+      this.logger.info({ recipient, mediaType, messageId: data.data?.id }, 'WhatsApp media sent');
 
       return {
         success: true,
         messageId: data.data?.id || data.id,
         data,
-      }
+      };
     } catch (error) {
-      this.logger.error({ error }, 'Failed to send media message')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Failed to send media message');
+      return { success: false, error: error.message };
     }
   }
 
@@ -453,8 +537,8 @@ class WhatsAppService {
    * Create WhatsApp template
    */
   async createTemplate({ channelAccountId, templateName, category, language, components }) {
-    const authKey = await this.getAuthKey(channelAccountId)
-    const integratedNumber = await this.getIntegratedNumber(channelAccountId)
+    const { account, authKey, baseUrl, integratedNumber } =
+      await this.getAccountContext(channelAccountId);
 
     const payload = {
       integrated_number: integratedNumber,
@@ -462,32 +546,32 @@ class WhatsAppService {
       language: language || 'en',
       category: category || 'MARKETING',
       components: components || [],
-    }
+    };
 
     try {
-      const response = await fetch(`${MSG91_CONTROL_URL}/whatsapp/client-panel-template/`, {
+      const response = await fetch(`${baseUrl}/whatsapp/client-panel-template/`, {
         method: 'POST',
-        headers: this.getHeaders(authKey),
+        headers: this.getHeaders(authKey, account),
         body: JSON.stringify(payload),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        return { success: false, error: data.message || 'Failed to create template' }
+        return { success: false, error: data.message || 'Failed to create template' };
       }
 
-      this.logger.info({ templateName, templateId: data.template_id }, 'WhatsApp template created')
+      this.logger.info({ templateName, templateId: data.template_id }, 'WhatsApp template created');
 
       return {
         success: true,
         templateId: data.template_id,
         message: 'Template created, pending WhatsApp approval',
         data,
-      }
+      };
     } catch (error) {
-      this.logger.error({ error }, 'Failed to create template')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Failed to create template');
+      return { success: false, error: error.message };
     }
   }
 
@@ -495,33 +579,33 @@ class WhatsAppService {
    * Delete WhatsApp template
    */
   async deleteTemplate({ channelAccountId, templateName }) {
-    const authKey = await this.getAuthKey(channelAccountId)
-    const integratedNumber = await this.getIntegratedNumber(channelAccountId)
+    const { account, authKey, baseUrl, integratedNumber } =
+      await this.getAccountContext(channelAccountId);
 
     const payload = {
       integrated_number: integratedNumber,
       template_name: templateName,
-    }
+    };
 
     try {
-      const response = await fetch(`${MSG91_CONTROL_URL}/whatsapp/client-panel-template/`, {
+      const response = await fetch(`${baseUrl}/whatsapp/client-panel-template/`, {
         method: 'DELETE',
-        headers: this.getHeaders(authKey),
+        headers: this.getHeaders(authKey, account),
         body: JSON.stringify(payload),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        return { success: false, error: data.message || 'Failed to delete template' }
+        return { success: false, error: data.message || 'Failed to delete template' };
       }
 
-      this.logger.info({ templateName }, 'WhatsApp template deleted')
+      this.logger.info({ templateName }, 'WhatsApp template deleted');
 
-      return { success: true, data }
+      return { success: true, data };
     } catch (error) {
-      this.logger.error({ error }, 'Failed to delete template')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Failed to delete template');
+      return { success: false, error: error.message };
     }
   }
 
@@ -535,36 +619,37 @@ class WhatsAppService {
   async processWebhook(channelAccountId, payload) {
     const account = await prisma.channelAccount.findUnique({
       where: { id: channelAccountId },
-    })
+    });
 
     if (!account) {
-      throw new Error('Channel account not found')
+      throw new Error('Channel account not found');
     }
 
     // Parse the webhook based on type
-    const messageType = payload.type || payload.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.type
+    const messageType =
+      payload.type || payload.entry?.[0]?.changes?.[0]?.value?.messages?.[0]?.type;
 
     if (payload.status || payload.statuses) {
       // Status update (sent, delivered, read, failed)
-      return this.processStatusWebhook(account, payload)
+      return this.processStatusWebhook(account, payload);
     } else if (payload.messages || payload.entry) {
       // Incoming message
-      return this.processIncomingMessage(account, payload)
+      return this.processIncomingMessage(account, payload);
     }
 
-    this.logger.warn({ payload }, 'Unknown webhook type')
-    return { success: false, error: 'Unknown webhook type' }
+    this.logger.warn({ payload }, 'Unknown webhook type');
+    return { success: false, error: 'Unknown webhook type' };
   }
 
   /**
    * Process status webhook (delivery reports)
    */
   async processStatusWebhook(account, payload) {
-    const statuses = payload.statuses || payload.entry?.[0]?.changes?.[0]?.value?.statuses || []
+    const statuses = payload.statuses || payload.entry?.[0]?.changes?.[0]?.value?.statuses || [];
 
     for (const status of statuses) {
-      const messageId = status.id
-      const newStatus = status.status?.toUpperCase() // sent, delivered, read, failed
+      const messageId = status.id;
+      const newStatus = status.status?.toUpperCase(); // sent, delivered, read, failed
 
       // Update message status in database
       await prisma.message.updateMany({
@@ -578,24 +663,24 @@ class WhatsAppService {
             errorMessage: status.errors?.[0]?.title,
           }),
         },
-      })
+      });
 
-      this.logger.info({ messageId, status: newStatus }, 'WhatsApp status updated')
+      this.logger.info({ messageId, status: newStatus }, 'WhatsApp status updated');
     }
 
-    return { success: true, processed: statuses.length }
+    return { success: true, processed: statuses.length };
   }
 
   /**
    * Process incoming message
    */
   async processIncomingMessage(account, payload) {
-    const messages = payload.messages || payload.entry?.[0]?.changes?.[0]?.value?.messages || []
-    const contacts = payload.contacts || payload.entry?.[0]?.changes?.[0]?.value?.contacts || []
+    const messages = payload.messages || payload.entry?.[0]?.changes?.[0]?.value?.messages || [];
+    const contacts = payload.contacts || payload.entry?.[0]?.changes?.[0]?.value?.contacts || [];
 
     for (const msg of messages) {
-      const from = msg.from
-      const contact = contacts.find(c => c.wa_id === from)
+      const from = msg.from;
+      const contact = contacts.find((c) => c.wa_id === from);
 
       const messageData = {
         tenantId: account.tenantId,
@@ -616,20 +701,20 @@ class WhatsAppService {
           messageType: msg.type,
           raw: msg,
         },
-      }
+      };
 
       // Create message record
       const message = await prisma.message.create({
         data: messageData,
-      })
+      });
 
       // Find or create contact
-      await this.upsertContact(account.tenantId, from, contact?.profile?.name)
+      await this.upsertContact(account.tenantId, from, contact?.profile?.name);
 
-      this.logger.info({ messageId: message.id, from }, 'WhatsApp message received')
+      this.logger.info({ messageId: message.id, from }, 'WhatsApp message received');
     }
 
-    return { success: true, processed: messages.length }
+    return { success: true, processed: messages.length };
   }
 
   /**
@@ -638,23 +723,27 @@ class WhatsAppService {
   extractMessageContent(msg) {
     switch (msg.type) {
       case 'text':
-        return msg.text?.body || ''
+        return msg.text?.body || '';
       case 'image':
-        return msg.image?.caption || '[Image]'
+        return msg.image?.caption || '[Image]';
       case 'video':
-        return msg.video?.caption || '[Video]'
+        return msg.video?.caption || '[Video]';
       case 'audio':
-        return '[Audio]'
+        return '[Audio]';
       case 'document':
-        return msg.document?.filename || '[Document]'
+        return msg.document?.filename || '[Document]';
       case 'location':
-        return `[Location: ${msg.location?.latitude}, ${msg.location?.longitude}]`
+        return `[Location: ${msg.location?.latitude}, ${msg.location?.longitude}]`;
       case 'contacts':
-        return '[Contact shared]'
+        return '[Contact shared]';
       case 'interactive':
-        return msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || '[Interactive]'
+        return (
+          msg.interactive?.button_reply?.title ||
+          msg.interactive?.list_reply?.title ||
+          '[Interactive]'
+        );
       default:
-        return `[${msg.type || 'Unknown'}]`
+        return `[${msg.type || 'Unknown'}]`;
     }
   }
 
@@ -664,17 +753,17 @@ class WhatsAppService {
   extractMediaUrl(msg) {
     switch (msg.type) {
       case 'image':
-        return msg.image?.link || msg.image?.url || msg.image?.id || null
+        return msg.image?.link || msg.image?.url || msg.image?.id || null;
       case 'video':
-        return msg.video?.link || msg.video?.url || msg.video?.id || null
+        return msg.video?.link || msg.video?.url || msg.video?.id || null;
       case 'audio':
-        return msg.audio?.link || msg.audio?.url || msg.audio?.id || null
+        return msg.audio?.link || msg.audio?.url || msg.audio?.id || null;
       case 'document':
-        return msg.document?.link || msg.document?.url || msg.document?.id || null
+        return msg.document?.link || msg.document?.url || msg.document?.id || null;
       case 'sticker':
-        return msg.sticker?.link || msg.sticker?.url || msg.sticker?.id || null
+        return msg.sticker?.link || msg.sticker?.url || msg.sticker?.id || null;
       default:
-        return null
+        return null;
     }
   }
 
@@ -682,11 +771,11 @@ class WhatsAppService {
    * Extract media type from message
    */
   extractMediaType(msg) {
-    const type = msg.type?.toLowerCase()
+    const type = msg.type?.toLowerCase();
     if (['image', 'video', 'audio', 'document', 'sticker'].includes(type)) {
-      return type
+      return type;
     }
-    return null
+    return null;
   }
 
   /**
@@ -694,7 +783,7 @@ class WhatsAppService {
    */
   async upsertContact(tenantId, phoneNumber, name) {
     // Normalize phone number
-    const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`
+    const normalizedPhone = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
 
     // Try to find existing contact
     let contact = await prisma.contact.findFirst({
@@ -702,7 +791,7 @@ class WhatsAppService {
         tenantId,
         phone: normalizedPhone,
       },
-    })
+    });
 
     if (!contact && name) {
       // Create new contact
@@ -715,12 +804,15 @@ class WhatsAppService {
           source: 'WHATSAPP',
           status: 'ACTIVE',
         },
-      })
+      });
 
-      this.logger.info({ contactId: contact.id, phone: normalizedPhone }, 'Contact created from WhatsApp')
+      this.logger.info(
+        { contactId: contact.id, phone: normalizedPhone },
+        'Contact created from WhatsApp'
+      );
     }
 
-    return contact
+    return contact;
   }
 
   // =====================
@@ -732,10 +824,10 @@ class WhatsAppService {
    */
   async checkHealth(channelAccountId) {
     try {
-      const authKey = await this.getAuthKey(channelAccountId)
-      const numbers = await this.getIntegratedNumbers(authKey)
+      const authKey = await this.getAuthKey(channelAccountId);
+      const numbers = await this.getIntegratedNumbers(authKey);
 
-      const isHealthy = numbers.success && numbers.data?.length > 0
+      const isHealthy = numbers.success && numbers.data?.length > 0;
 
       await prisma.channelAccount.update({
         where: { id: channelAccountId },
@@ -743,13 +835,13 @@ class WhatsAppService {
           healthStatus: isHealthy ? 'HEALTHY' : 'UNHEALTHY',
           lastHealthCheck: new Date(),
         },
-      })
+      });
 
       return {
         success: true,
         healthy: isHealthy,
         numbers: numbers.data?.length || 0,
-      }
+      };
     } catch (error) {
       await prisma.channelAccount.update({
         where: { id: channelAccountId },
@@ -757,15 +849,15 @@ class WhatsAppService {
           healthStatus: 'ERROR',
           lastHealthCheck: new Date(),
         },
-      })
+      });
 
       return {
         success: false,
         healthy: false,
         error: error.message,
-      }
+      };
     }
   }
 }
 
-export const whatsAppService = new WhatsAppService()
+export const whatsAppService = new WhatsAppService();

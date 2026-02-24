@@ -2,8 +2,173 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requirePermission } from '../../common/middleware/tenant.js';
 import { billingService } from './billing.service.js';
+import { razorpayService } from '../../services/razorpay.service.js';
+import { logger } from '../../common/logger.js';
 
 const router = Router();
+
+// ============ PLANS (from DB) ============
+
+router.get('/plans', async (req, res, next) => {
+  try {
+    const plans = await billingService.getPlans();
+    res.json({ success: true, data: plans });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============ CHECKOUT (Razorpay) ============
+
+router.post('/checkout/create-order', requirePermission('billing:read'), async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        planId: z.string().min(1),
+        billingCycle: z.enum(['MONTHLY', 'YEARLY']),
+      })
+      .parse(req.body);
+
+    const order = await billingService.createCheckoutOrder(
+      req.tenantId,
+      data.planId,
+      data.billingCycle
+    );
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post(
+  '/checkout/verify-payment',
+  requirePermission('billing:read'),
+  async (req, res, next) => {
+    try {
+      const data = z
+        .object({
+          razorpay_order_id: z.string().min(1),
+          razorpay_payment_id: z.string().min(1),
+          razorpay_signature: z.string().min(1),
+          planId: z.string().min(1),
+          billingCycle: z.enum(['MONTHLY', 'YEARLY']),
+        })
+        .parse(req.body);
+
+      const result = await billingService.verifyAndActivatePayment(req.tenantId, req.userId, data);
+
+      res.json({
+        success: true,
+        data: {
+          subscription: result.subscription,
+          invoice: result.invoice,
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ============ SUBSCRIPTION ============
+
+router.get('/subscription', requirePermission('billing:read'), async (req, res, next) => {
+  try {
+    const subscription = await billingService.getSubscription(req.tenantId);
+
+    res.json({
+      success: true,
+      data: subscription,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/subscription/cancel', requirePermission('billing:read'), async (req, res, next) => {
+  try {
+    const subscription = await billingService.cancelSubscription(req.tenantId);
+
+    res.json({
+      success: true,
+      data: subscription,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/subscription/upgrade', requirePermission('billing:read'), async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        planId: z.string().min(1),
+        billingCycle: z.enum(['MONTHLY', 'YEARLY']),
+      })
+      .parse(req.body);
+
+    const subscription = await billingService.upgradePlan(
+      req.tenantId,
+      data.planId,
+      data.billingCycle
+    );
+
+    res.json({
+      success: true,
+      data: subscription,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ============ DUNNING ============
+
+router.get('/dunning', requirePermission('billing:read'), async (req, res, next) => {
+  try {
+    const status = await billingService.getDunningStatus(req.tenantId);
+
+    res.json({
+      success: true,
+      data: status,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post(
+  '/dunning/retry/:paymentId',
+  requirePermission('billing:read'),
+  async (req, res, next) => {
+    try {
+      const result = await billingService.retryFailedPayment(req.tenantId, req.params.paymentId);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+// ============ TRIAL MANAGEMENT ============
+
+router.post('/trials/expire', requirePermission('billing:read'), async (req, res, next) => {
+  try {
+    const result = await billingService.expireTrials();
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // ============ QUOTES ============
 
@@ -446,4 +611,55 @@ router.post(
   }
 );
 
-export { router as billingRouter };
+// ============ RAZORPAY WEBHOOK (separate router, no auth) ============
+
+const webhookRouter = Router();
+
+/**
+ * Razorpay webhook endpoint.
+ * This route does NOT use tenant middleware or authentication.
+ * Instead, it verifies the Razorpay webhook signature.
+ *
+ * Events handled:
+ *   - payment.captured
+ *   - payment.failed
+ *   - subscription.charged
+ *   - subscription.cancelled
+ */
+webhookRouter.post('/webhook', async (req, res) => {
+  try {
+    const signature = req.headers['x-razorpay-signature'];
+
+    if (!signature) {
+      logger.warn('Razorpay webhook received without signature header');
+      return res.status(400).json({ success: false, error: 'Missing signature' });
+    }
+
+    // Verify webhook signature
+    const isValid = razorpayService.verifyWebhookSignature(req.body, signature);
+
+    if (!isValid) {
+      logger.warn('Razorpay webhook signature verification failed');
+      return res.status(400).json({ success: false, error: 'Invalid signature' });
+    }
+
+    const { event, payload } = req.body;
+
+    logger.info({ event }, 'Razorpay webhook received');
+
+    // Process the event asynchronously (respond 200 immediately)
+    res.status(200).json({ success: true });
+
+    // Handle the event after responding
+    try {
+      await billingService.handleWebhookEvent(event, payload);
+    } catch (error) {
+      logger.error({ error: error.message, event }, 'Error processing Razorpay webhook event');
+    }
+  } catch (error) {
+    logger.error({ error: error.message }, 'Razorpay webhook error');
+    res.status(500).json({ success: false, error: 'Internal error' });
+  }
+});
+
+export { router as billingRouter, webhookRouter as billingWebhookRouter };

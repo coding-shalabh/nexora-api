@@ -66,7 +66,7 @@ export async function tenantMiddleware(req, res, next) {
       // Infer role level from role name for permission hierarchy
       let effectiveLevel = 1;
       if (roleName.includes('super') && roleName.includes('admin')) effectiveLevel = 10;
-      else if (roleName === 'admin' || roleName.includes('administrator')) effectiveLevel = 9;
+      else if (roleName.includes('admin')) effectiveLevel = 9;
       else if (roleName.includes('manager')) effectiveLevel = 8;
       else if (roleName.includes('marketing')) effectiveLevel = 7;
       else if (roleName.includes('sales')) effectiveLevel = 6;
@@ -91,10 +91,19 @@ export async function tenantMiddleware(req, res, next) {
       permissions.add('*'); // Full access for Admin and Super Admin
     } else if (maxRoleLevel >= 7) {
       // Manager/Marketing level - add common permissions
-      ['crm:*', 'analytics:read', 'inbox:*', 'pipeline:*', 'settings:read'].forEach(p => permissions.add(p));
+      ['crm:*', 'analytics:read', 'inbox:*', 'pipeline:*', 'settings:read'].forEach((p) =>
+        permissions.add(p)
+      );
     } else if (maxRoleLevel >= 5) {
       // Support/Sales level - add operational permissions
-      ['crm:contacts:*', 'crm:deals:*', 'crm:activities:*', 'inbox:*', 'tickets:*', 'analytics:read'].forEach(p => permissions.add(p));
+      [
+        'crm:contacts:*',
+        'crm:deals:*',
+        'crm:activities:*',
+        'inbox:*',
+        'tickets:*',
+        'analytics:read',
+      ].forEach((p) => permissions.add(p));
     }
 
     // Attach user context to request

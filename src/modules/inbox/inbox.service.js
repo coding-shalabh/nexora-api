@@ -50,14 +50,11 @@ class InboxService {
           where.status = { in: ['OPEN', 'PENDING'] };
           break;
         case 'starred':
-          // Note: isStarred field is on ConversationThread, not Conversation
-          // For now, return empty results for starred bucket
-          where.id = 'NONE'; // Will return no results
+          where.isStarred = true;
           break;
         case 'snoozed':
-          // Note: SNOOZED is not a valid ConversationStatus value
-          // For now, return empty results for snoozed bucket
-          where.id = 'NONE'; // Will return no results
+          // SNOOZED is not a valid status — snoozed conversations use PENDING
+          where.status = 'PENDING';
           break;
         case 'resolved':
           where.status = 'RESOLVED';
@@ -90,10 +87,8 @@ class InboxService {
     // Priority filter not supported for Conversation model
 
     // ========== STARRED FILTER ==========
-    // Note: isStarred field is on ConversationThread, not Conversation
-    // Starred filter not supported for Conversation model
     if (filters.starred === 'true' || filters.starred === true) {
-      where.id = 'NONE'; // Will return no results
+      where.isStarred = true;
     }
 
     // ========== CHANNEL TYPE FILTER ==========
@@ -119,12 +114,34 @@ class InboxService {
     }
 
     // Filter by specific channel account (e.g., specific WhatsApp number)
+    // ChannelAccount and Channel are separate models; Conversation.channelId → Channel.id
+    // Look up the ChannelAccount's type, then find the matching Channel to filter by channelId
     if (filters.channelAccountId) {
-      where.messages = {
-        some: {
-          channelAccountId: filters.channelAccountId,
-        },
-      };
+      const ca = await prisma.channelAccount.findUnique({
+        where: { id: filters.channelAccountId },
+        select: { type: true },
+      });
+      if (ca) {
+        const caToChannelType = {
+          WHATSAPP: 'WHATSAPP',
+          SMS: 'SMS',
+          EMAIL_SMTP: 'EMAIL',
+          EMAIL_GMAIL: 'EMAIL',
+          EMAIL_MICROSOFT: 'EMAIL',
+          VOICE: 'VOICE',
+        };
+        const channelType = caToChannelType[ca.type] || ca.type;
+        // Find the Channel record matching this type for the tenant
+        const channel = await prisma.channel.findFirst({
+          where: { tenantId, type: channelType },
+          select: { id: true },
+        });
+        if (channel) {
+          where.channelId = channel.id;
+          // Override the channel relation filter to match specifically
+          where.channel = { type: channelType };
+        }
+      }
     }
 
     // ========== ASSIGNMENT FILTERS ==========
@@ -198,6 +215,17 @@ class InboxService {
         : [];
     const channelMap = new Map(channels.map((ch) => [ch.id, ch.type]));
 
+    // Batch-fetch purpose from ConversationThread (same IDs as Conversation)
+    const convIds = conversations.map((c) => c.id);
+    const threads =
+      convIds.length > 0
+        ? await prisma.conversationThread.findMany({
+            where: { id: { in: convIds }, tenantId },
+            select: { id: true, purpose: true },
+          })
+        : [];
+    const purposeMap = new Map(threads.map((t) => [t.id, t.purpose]));
+
     // Transform to expected format
     const transformedConversations = conversations.map((conv) => {
       const channelType = conv.channelId ? channelMap.get(conv.channelId) : null;
@@ -222,6 +250,8 @@ class InboxService {
         assignedToId: conv.assignedToId,
         priority: conv.priority?.toLowerCase() || 'medium',
         messageCount: conv.messageCount || 0,
+        isStarred: conv.isStarred || false,
+        purpose: purposeMap.get(conv.id) || 'GENERAL',
         // Email specific fields
         subject: isEmail ? conv.subject || null : null,
       };
@@ -268,7 +298,7 @@ class InboxService {
       assignedToId: conversation.assignedToId,
       priority: conversation.priority?.toLowerCase() || 'medium',
       unreadCount: conversation.unreadCount,
-      messageCount: 0, // messageCount not in Conversation model
+      messageCount: await prisma.message_events.count({ where: { threadId: conversationId } }),
       lastMessageAt: conversation.lastCustomerMessageAt || conversation.updatedAt,
       createdAt: conversation.createdAt,
       contact: conversation.contact,
@@ -350,11 +380,18 @@ class InboxService {
 
     const convChannelType = conversation.channel?.type;
 
+    // Map Channel.type (ChannelType enum) to ChannelAccount.type (ChannelAccountType enum)
+    // ChannelType has EMAIL but ChannelAccountType has EMAIL_GMAIL, EMAIL_MICROSOFT, EMAIL_SMTP
+    const accountTypeFilter =
+      convChannelType === 'EMAIL'
+        ? { in: ['EMAIL_GMAIL', 'EMAIL_MICROSOFT', 'EMAIL_SMTP'] }
+        : convChannelType;
+
     // Get a channel account for this channel type
     const channelAccount = await prisma.channelAccount.findFirst({
       where: {
         tenantId,
-        type: convChannelType,
+        type: accountTypeFilter,
         status: 'ACTIVE',
       },
     });
@@ -390,15 +427,19 @@ class InboxService {
       messageContent = `${messageContent}\n\n${signature.content}`;
     }
 
-    // Create message record
-    const message = await prisma.conversationThread.create({
+    // Create message record in message_events (unified message store)
+    // Use channelAccount.type (ChannelAccountType enum) not convChannelType (ChannelType enum)
+    // because message_events.channel expects ChannelAccountType (e.g. EMAIL_SMTP not EMAIL)
+    const message = await prisma.message_events.create({
       data: {
         tenantId,
-        conversation: { connect: { id: conversationId } },
-        channel: convChannelType,
+        threadId: conversationId, // ConversationThread shares ID with Conversation
+        channelAccountId: channelAccount.id,
+        channel: channelAccount.type,
         direction: 'OUTBOUND',
-        contentType: data.type || 'TEXT',
+        contentType: (data.type || 'TEXT').toUpperCase(),
         textContent: messageContent,
+        status: 'SENT',
         sentAt: new Date(),
       },
     });
@@ -412,24 +453,30 @@ class InboxService {
       },
     });
 
-    // Get recipient phone number from conversation or contact
-    const recipientPhone = conversation.contactPhone || conversation.contact?.phone;
+    // Channel-aware recipient validation and sending
+    const isEmailChannel = ['EMAIL', 'EMAIL_GMAIL', 'EMAIL_MICROSOFT', 'EMAIL_SMTP'].includes(
+      convChannelType
+    );
 
-    if (!recipientPhone) {
-      logger.error({ conversationId }, 'No recipient phone number found');
-      await prisma.conversationThread.update({
-        where: { id: message.id },
-        data: {
-          failedAt: new Date(),
-          failureReason: 'No recipient phone number',
-          metadata: { error: 'No recipient phone number' },
-        },
-      });
-      throw new Error('No recipient phone number found');
-    }
-
-    // Send via MSG91 WhatsApp
     if (convChannelType === 'WHATSAPP') {
+      // Validate phone for WhatsApp
+      const recipientPhone = conversation.contactPhone || conversation.contact?.phone;
+
+      if (!recipientPhone) {
+        logger.error({ conversationId }, 'No recipient phone number found');
+        await prisma.message_events.update({
+          where: { id: message.id },
+          data: {
+            failedAt: new Date(),
+            failureReason: 'No recipient phone number',
+            status: 'FAILED',
+            metadata: { error: 'No recipient phone number' },
+          },
+        });
+        throw new Error('No recipient phone number found');
+      }
+
+      // Send via MSG91 WhatsApp
       try {
         logger.info(
           {
@@ -449,7 +496,7 @@ class InboxService {
 
         if (sendResult.success) {
           // Update message with provider message ID for status tracking
-          await prisma.conversationThread.update({
+          await prisma.message_events.update({
             where: { id: message.id },
             data: {
               providerMessageId: sendResult.messageId,
@@ -468,11 +515,12 @@ class InboxService {
             logger.warn({ error: wsError.message }, 'Failed to broadcast sent status');
           }
         } else {
-          await prisma.conversationThread.update({
+          await prisma.message_events.update({
             where: { id: message.id },
             data: {
               failedAt: new Date(),
               failureReason: sendResult.error || 'Failed to send message',
+              status: 'FAILED',
               metadata: { error: sendResult.error || 'Failed to send message' },
             },
           });
@@ -493,11 +541,12 @@ class InboxService {
           { error: error.message, messageId: message.id },
           'Error sending WhatsApp message'
         );
-        await prisma.conversationThread.update({
+        await prisma.message_events.update({
           where: { id: message.id },
           data: {
             failedAt: new Date(),
             failureReason: error.message,
+            status: 'FAILED',
             metadata: { error: error.message },
           },
         });
@@ -509,9 +558,71 @@ class InboxService {
           logger.warn({ error: wsError.message }, 'Failed to broadcast failed status');
         }
       }
+    } else if (isEmailChannel) {
+      // Validate email for email channels
+      const recipientEmail = conversation.contact?.email;
+
+      if (!recipientEmail) {
+        logger.error({ conversationId }, 'No recipient email address found');
+        await prisma.message_events.update({
+          where: { id: message.id },
+          data: {
+            failedAt: new Date(),
+            failureReason: 'No recipient email address',
+            status: 'FAILED',
+            metadata: { error: 'No recipient email address' },
+          },
+        });
+        throw new Error('No recipient email address found');
+      }
+
+      // Email message recorded — delivery handled by connected email accounts
+      logger.info(
+        { conversationId, recipientEmail, messageId: message.id },
+        'Email message recorded in conversation'
+      );
+
+      try {
+        broadcastMessageStatus(tenantId, message.id, conversationId, 'sent');
+      } catch (wsError) {
+        logger.warn({ error: wsError.message }, 'Failed to broadcast sent status');
+      }
+    } else if (convChannelType === 'SMS') {
+      // Validate phone for SMS
+      const recipientPhone = conversation.contactPhone || conversation.contact?.phone;
+
+      if (!recipientPhone) {
+        logger.error({ conversationId }, 'No recipient phone number found');
+        await prisma.message_events.update({
+          where: { id: message.id },
+          data: {
+            failedAt: new Date(),
+            failureReason: 'No recipient phone number',
+            status: 'FAILED',
+            metadata: { error: 'No recipient phone number' },
+          },
+        });
+        throw new Error('No recipient phone number found');
+      }
+
+      // SMS message recorded — delivery handled by connected SMS provider
+      logger.info(
+        { conversationId, recipientPhone, messageId: message.id },
+        'SMS message recorded in conversation'
+      );
+
+      try {
+        broadcastMessageStatus(tenantId, message.id, conversationId, 'sent');
+      } catch (wsError) {
+        logger.warn({ error: wsError.message }, 'Failed to broadcast sent status');
+      }
     } else {
-      // For other channels, message already has sentAt set during creation
-      // Broadcast sent status
+      // Other channels (VOICE, etc.) — message recorded
+      logger.info(
+        { conversationId, channelType: convChannelType, messageId: message.id },
+        'Message recorded for channel'
+      );
+
       try {
         broadcastMessageStatus(tenantId, message.id, conversationId, 'sent');
       } catch (wsError) {
@@ -520,7 +631,7 @@ class InboxService {
     }
 
     // Fetch updated message
-    const updatedMessage = await prisma.conversationThread.findUnique({
+    const updatedMessage = await prisma.message_events.findUnique({
       where: { id: message.id },
     });
 
@@ -551,7 +662,7 @@ class InboxService {
 
     const responseMessage = {
       id: message.id,
-      conversationId: message.conversationId,
+      conversationId: conversationId,
       direction: 'outbound',
       type: updatedMessage?.contentType?.toLowerCase() || 'text',
       content: finalMessageContent,
@@ -565,13 +676,119 @@ class InboxService {
       broadcastNewMessage({
         ...responseMessage,
         tenantId,
-        conversationId: message.conversationId,
+        threadId: conversationId,
       });
     } catch (wsError) {
       logger.warn({ error: wsError.message }, 'Failed to broadcast outbound message via WebSocket');
     }
 
     return responseMessage;
+  }
+
+  async createConversation(tenantId, data) {
+    // Find or create a channel for this tenant + channelType
+    let channel = await prisma.channel.findFirst({
+      where: { tenantId, type: data.channelType, status: 'ACTIVE' },
+    });
+
+    if (!channel) {
+      // Create a default channel for this type
+      channel = await prisma.channel.create({
+        data: {
+          tenantId,
+          type: data.channelType,
+          name: `${data.channelType} Channel`,
+          provider: data.channelType.toLowerCase(),
+          status: 'ACTIVE',
+        },
+      });
+    }
+
+    const conversation = await prisma.conversation.create({
+      data: {
+        tenantId,
+        channelId: channel.id,
+        channelType: data.channelType,
+        contactId: data.contactId || undefined,
+        contactPhone: data.contactPhone || undefined,
+        status: 'OPEN',
+      },
+      include: {
+        contact: true,
+        channel: true,
+      },
+    });
+
+    // Create matching ConversationThread with same ID (message_events FK needs this)
+    await prisma.conversationThread.create({
+      data: {
+        id: conversation.id,
+        tenantId,
+        contactId: data.contactId || undefined,
+        contactPhone: data.contactPhone || undefined,
+        status: 'OPEN',
+        lastMessageChannel: data.channelType,
+      },
+    });
+
+    // If an initial message was provided, create it as a message_events record
+    if (data.initialMessage) {
+      const channelAccount = await prisma.channelAccount.findFirst({
+        where: { tenantId, type: data.channelType, status: 'ACTIVE' },
+      });
+      if (channelAccount) {
+        await prisma.message_events.create({
+          data: {
+            tenantId,
+            threadId: conversation.id,
+            channelAccountId: channelAccount.id,
+            channel: data.channelType,
+            direction: 'OUTBOUND',
+            contentType: 'TEXT',
+            textContent: data.initialMessage,
+            status: 'SENT',
+            sentAt: new Date(),
+          },
+        });
+      }
+    }
+
+    logger.info(
+      { conversationId: conversation.id, channelType: data.channelType },
+      'Conversation created'
+    );
+
+    return conversation;
+  }
+
+  async updateConversation(tenantId, conversationId, data) {
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, tenantId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    const updateData = {};
+    if (data.status) updateData.status = data.status;
+    if (data.assignedTo) updateData.assignedToId = data.assignedTo;
+    if (data.status === 'RESOLVED' || data.status === 'CLOSED') updateData.closedAt = new Date();
+    if (data.status === 'OPEN') updateData.closedAt = null;
+
+    const updated = await prisma.conversation.update({
+      where: { id: conversationId },
+      data: updateData,
+      include: {
+        contact: true,
+        channel: true,
+        assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+
+    logger.info({ conversationId, updates: Object.keys(updateData) }, 'Conversation updated');
+
+    return updated;
   }
 
   // Fixed: Use relation syntax for Prisma - 2026-01-12T17:50
@@ -606,9 +823,9 @@ class InboxService {
     }
 
     // Check if agent has replied (at least one outbound message)
-    const outboundCount = await prisma.conversationThread.count({
+    const outboundCount = await prisma.message_events.count({
       where: {
-        conversationId: conversationId,
+        threadId: conversationId,
         direction: 'OUTBOUND',
       },
     });
@@ -683,14 +900,18 @@ class InboxService {
     }
 
     // Delete all messages first (due to foreign key constraint)
-    await prisma.conversationThread.deleteMany({
-      where: { conversationId: conversationId },
+    await prisma.message_events.deleteMany({
+      where: { threadId: conversationId },
     });
 
     // Delete conversation notes if any
-    await prisma.conversationNote.deleteMany({
-      where: { conversationId: conversationId },
-    });
+    try {
+      await prisma.conversationNote.deleteMany({
+        where: { conversationId: conversationId },
+      });
+    } catch (e) {
+      // ConversationNote may not exist for all conversations
+    }
 
     // Delete the conversation
     await prisma.conversation.delete({
@@ -757,6 +978,99 @@ class InboxService {
     return updated;
   }
 
+  async snoozeConversation(tenantId, conversationId, { duration, customUntil, reason, userId }) {
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, tenantId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    const now = new Date();
+    let snoozedUntil;
+
+    switch (duration) {
+      case 'LATER_TODAY':
+        snoozedUntil = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+        break;
+      case 'TOMORROW':
+        snoozedUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+        snoozedUntil.setHours(9, 0, 0, 0);
+        break;
+      case 'NEXT_WEEK': {
+        const daysUntilMonday = (8 - now.getDay()) % 7 || 7;
+        snoozedUntil = new Date(now.getTime() + daysUntilMonday * 24 * 60 * 60 * 1000);
+        snoozedUntil.setHours(9, 0, 0, 0);
+        break;
+      }
+      default:
+        if (customUntil) {
+          snoozedUntil = new Date(customUntil);
+        } else {
+          throw new Error('Invalid snooze duration');
+        }
+    }
+
+    // Update Conversation status to PENDING (proxy for snoozed)
+    const updated = await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { status: 'PENDING' },
+    });
+
+    // Also update ConversationThread if it exists (has proper snooze fields)
+    try {
+      await prisma.conversationThread.updateMany({
+        where: { id: conversationId, tenantId },
+        data: {
+          status: 'SNOOZED',
+          snoozedUntil,
+          snoozedAt: now,
+          snoozedById: userId || null,
+          snoozeReason: reason || null,
+        },
+      });
+    } catch (e) {
+      // ConversationThread may not exist for this conversation — that's fine
+      logger.debug({ conversationId }, 'No ConversationThread to update for snooze');
+    }
+
+    return { ...updated, snoozedUntil, snoozeStatus: 'snoozed' };
+  }
+
+  async unsnoozeConversation(tenantId, conversationId) {
+    const conversation = await prisma.conversation.findFirst({
+      where: { id: conversationId, tenantId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundError('Conversation not found');
+    }
+
+    const updated = await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { status: 'OPEN' },
+    });
+
+    // Also clear snooze fields on ConversationThread
+    try {
+      await prisma.conversationThread.updateMany({
+        where: { id: conversationId, tenantId },
+        data: {
+          status: 'OPEN',
+          snoozedUntil: null,
+          snoozedAt: null,
+          snoozedById: null,
+          snoozeReason: null,
+        },
+      });
+    } catch (e) {
+      logger.debug({ conversationId }, 'No ConversationThread to update for unsnooze');
+    }
+
+    return updated;
+  }
+
   async getChannels(tenantId) {
     // Use raw SQL to avoid Prisma enum validation issues with invalid healthStatus values
     const channels = await prisma.$queryRaw`
@@ -819,10 +1133,14 @@ class InboxService {
               where: { tenantId, assignedToId: userId, status: { in: ['OPEN', 'PENDING'] } },
             })
           : Promise.resolve(0),
-        // Starred conversations - isStarred not on Conversation model, return 0
-        Promise.resolve(0),
-        // Snoozed conversations - SNOOZED not a valid status, return 0
-        Promise.resolve(0),
+        // Starred conversations
+        prisma.conversation.count({
+          where: { tenantId, isStarred: true },
+        }),
+        // Snoozed conversations (uses PENDING status)
+        prisma.conversation.count({
+          where: { tenantId, status: 'PENDING' },
+        }),
         // Archived/closed conversations
         prisma.conversation.count({
           where: { tenantId, status: { in: ['RESOLVED', 'CLOSED'] } },
@@ -1298,7 +1616,6 @@ class InboxService {
               lastName: true,
               email: true,
               phone: true,
-              avatarUrl: true,
             },
           },
         },
@@ -1357,8 +1674,31 @@ class InboxService {
       distinct: ['contactId'],
     });
 
-    // Calculate average response time (mock for now)
-    const avgResponseTime = '2.0 min';
+    // Calculate average response time from first response to customer messages
+    let avgResponseTime = 'N/A';
+    try {
+      const result = await prisma.$queryRaw`
+        SELECT AVG(EXTRACT(EPOCH FROM (agent_msg."createdAt" - cust_msg."createdAt"))) / 60 as avg_minutes
+        FROM message_events cust_msg
+        INNER JOIN LATERAL (
+          SELECT "createdAt" FROM message_events
+          WHERE "threadId" = cust_msg."threadId"
+            AND direction = 'OUTBOUND'
+            AND "createdAt" > cust_msg."createdAt"
+          ORDER BY "createdAt" ASC LIMIT 1
+        ) agent_msg ON true
+        WHERE cust_msg."tenantId" = ${tenantId}
+          AND cust_msg.direction = 'INBOUND'
+          AND cust_msg."createdAt" >= ${dateFrom}
+          AND cust_msg."createdAt" <= ${dateTo}
+      `;
+      const mins = result[0]?.avg_minutes;
+      if (mins != null) {
+        avgResponseTime = mins < 1 ? `${Math.round(mins * 60)} sec` : `${mins.toFixed(1)} min`;
+      }
+    } catch {
+      avgResponseTime = 'N/A';
+    }
 
     // Get channel breakdown
     const channelStats = await prisma.conversation.groupBy({

@@ -21,7 +21,7 @@ class KBService {
       where,
       include: {
         _count: {
-          select: { articles: { where: { isPublished: true } } },
+          select: { articles: { where: { status: 'PUBLISHED' } } },
         },
         children: {
           where: { isPublished: true },
@@ -42,7 +42,7 @@ class KBService {
       where: { id: categoryId, tenantId },
       include: {
         articles: {
-          where: { isPublished: true },
+          where: { status: 'PUBLISHED' },
           orderBy: { createdAt: 'desc' },
         },
         children: true,
@@ -193,11 +193,10 @@ class KBService {
         content: data.content,
         excerpt: data.excerpt || data.content.substring(0, 200),
         authorId: userId,
-        status: data.status || 'DRAFT',
-        isPublished: data.isPublished ?? false,
+        status: data.status || (data.isPublished ? 'PUBLISHED' : 'DRAFT'),
         isFeatured: data.isFeatured ?? false,
         tags: data.tags || [],
-        publishedAt: data.isPublished ? new Date() : null,
+        publishedAt: data.status === 'PUBLISHED' || data.isPublished ? new Date() : null,
       },
       include: {
         category: { select: { id: true, name: true } },
@@ -226,7 +225,7 @@ class KBService {
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.isPublished !== undefined) {
-      updateData.isPublished = data.isPublished;
+      updateData.status = data.isPublished ? 'PUBLISHED' : 'DRAFT';
       if (data.isPublished && !article.publishedAt) {
         updateData.publishedAt = new Date();
       }
@@ -282,7 +281,7 @@ class KBService {
     const [totalArticles, totalCategories, publishedArticles, totalViews] = await Promise.all([
       prisma.kBArticle.count({ where: { tenantId } }),
       prisma.kBCategory.count({ where: { tenantId } }),
-      prisma.kBArticle.count({ where: { tenantId, isPublished: true } }),
+      prisma.kBArticle.count({ where: { tenantId, status: 'PUBLISHED' } }),
       prisma.kBArticle.aggregate({
         where: { tenantId },
         _sum: { viewCount: true },

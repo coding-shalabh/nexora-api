@@ -73,6 +73,13 @@ export const environmentConfig = {
     },
   },
 
+  // Razorpay Payment Gateway
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID || '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
+  },
+
   // Logging
   logging: {
     level: process.env.LOG_LEVEL || 'info',

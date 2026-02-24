@@ -3,9 +3,11 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { pinoHttp } from 'pino-http';
+import { prisma } from '@crm360/database';
 import { logger } from './common/logger.js';
 import { config } from './config/index.js';
 import { errorHandler } from './common/middleware/error-handler.js';
+import { Sentry } from './config/sentry.js';
 import { rateLimiter } from './common/middleware/rate-limiter.js';
 import { tenantMiddleware } from './common/middleware/tenant.js';
 import { demoTenantMiddleware } from './common/middleware/demo-tenant.js';
@@ -19,7 +21,7 @@ import { pipelineRouter } from './modules/pipeline/pipeline.router.js';
 import { ticketsRouter } from './modules/tickets/tickets.router.js';
 import { kbRouter } from './modules/knowledge-base/kb.router.js';
 import { surveysRouter } from './modules/surveys/surveys.router.js';
-import { billingRouter } from './modules/billing/billing.router.js';
+import { billingRouter, billingWebhookRouter } from './modules/billing/billing.router.js';
 import { walletRouter } from './modules/wallet/wallet.router.js';
 import { automationRouter } from './modules/automation/automation.router.js';
 import { analyticsRouter } from './modules/analytics/analytics.router.js';
@@ -72,6 +74,8 @@ import testRouter from './modules/test/test.router.js';
 import { hrRouter } from './modules/hr/index.js';
 import { commerceRouter } from './modules/commerce/index.js';
 import { salesRouter } from './modules/sales/index.js';
+import gstRouter from './modules/gst/gst.router.js';
+import { adminRouter } from './modules/admin/admin.router.js';
 // import aiAssistantRouter from './modules/ai-assistant/ai-assistant.router.js'; // Temporarily disabled - export issue
 // import bookingRouter from './modules/booking/booking.router.js'; // Temporarily disabled - needs refactoring to Express
 // import eSignatureRouter from './modules/e-signature/e-signature.router.js'; // Temporarily disabled - missing email utils
@@ -83,31 +87,42 @@ export async function createServer() {
   // Trust proxy for rate limiting behind reverse proxy
   app.set('trust proxy', 1);
 
+  // Serialize BigInt fields as numbers in JSON responses
+  app.set('json replacer', (key, value) => (typeof value === 'bigint' ? Number(value) : value));
+
   // Security middleware
   app.use(helmet());
   // CORS configuration - restrict to known origins
-  const allowedOrigins = [
+  const productionOrigins = [
     'https://nexoraos.pro',
     'https://www.nexoraos.pro',
     'https://api.nexoraos.pro',
     'https://72orionx.com',
     'https://www.72orionx.com',
-    // Development - localhost ports 3000-3010
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:3002',
-    'http://localhost:3003',
-    'http://localhost:3004',
-    'http://localhost:3005',
-    'http://localhost:3006',
-    'http://localhost:3007',
-    'http://localhost:3008',
-    'http://localhost:3009',
-    'http://localhost:3010',
-    'http://localhost:4000',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
   ];
+
+  // Only include localhost origins in non-production environments
+  const devOrigins =
+    config.nodeEnv !== 'production'
+      ? [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:3002',
+          'http://localhost:3003',
+          'http://localhost:3004',
+          'http://localhost:3005',
+          'http://localhost:3006',
+          'http://localhost:3007',
+          'http://localhost:3008',
+          'http://localhost:3009',
+          'http://localhost:3010',
+          'http://localhost:4000',
+          'http://127.0.0.1:3000',
+          'http://127.0.0.1:3001',
+        ]
+      : [];
+
+  const allowedOrigins = [...productionOrigins, ...devOrigins];
 
   app.use(
     cors({
@@ -137,9 +152,18 @@ export async function createServer() {
   // Rate limiting
   app.use(rateLimiter);
 
-  // Health check (before auth)
-  app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  // Health check (before auth) — verifies database connectivity
+  app.get('/health', async (_req, res) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: 'ok', database: 'connected', timestamp: new Date().toISOString() });
+    } catch (err) {
+      res.status(503).json({
+        status: 'degraded',
+        database: 'disconnected',
+        timestamp: new Date().toISOString(),
+      });
+    }
   });
 
   // Static files for uploads (public access) with CORS headers for cross-origin access
@@ -166,6 +190,7 @@ export async function createServer() {
   apiV1.use('/tracking', trackingRouter); // Mixed public/protected - has its own auth handling
   apiV1.use('/test/msg91', msg91TestRouter); // MSG91 API testing (no auth for testing)
   apiV1.use('/webhooks', webhooksRouter); // Channel webhooks (public - MSG91/Exotel calls these)
+  apiV1.use('/billing', billingWebhookRouter); // Razorpay webhook (public - signature verified internally)
   apiV1.use('/utils', utilsRouter); // Utility endpoints (link previews, etc.)
   // apiV1.use('/e-signature/sign', eSignatureRouter); // Public signing endpoints (no auth) - Temporarily disabled
   apiV1.use('/email', tenantMiddleware, emailRouter); // Email main router (includes send, track, domains, aliases, drafts, bulk, mailbox)
@@ -176,7 +201,7 @@ export async function createServer() {
       const { id } = req.params;
       res.status(200).json({ success: true });
       whatsAppService.processWebhook(id, req.body).catch((error) => {
-        console.error('WhatsApp webhook error:', error);
+        logger.error({ err: error, channelAccountId: id }, 'WhatsApp webhook processing error');
       });
     } catch (error) {
       res.status(200).json({ success: false });
@@ -221,6 +246,7 @@ export async function createServer() {
   apiV1.use('/sms', tenantMiddleware, smsRouter);
   apiV1.use('/products', tenantMiddleware, productsRouter);
   apiV1.use('/quotes', tenantMiddleware, quotesRouter);
+  apiV1.use('/gst', tenantMiddleware, gstRouter); // GST/Indian tax compliance
   apiV1.use('/resend', tenantMiddleware, resendRouter);
   apiV1.use('/msg91-email', tenantMiddleware, msg91EmailRouter);
   apiV1.use('/email-service', tenantMiddleware, emailServiceRouter);
@@ -234,10 +260,14 @@ export async function createServer() {
   apiV1.use('/hr', tenantMiddleware, hrRouter);
   apiV1.use('/commerce', tenantMiddleware, commerceRouter);
   apiV1.use('/sales', tenantMiddleware, salesRouter);
+  apiV1.use('/admin', adminRouter); // Admin utilities (seed industry data, etc.)
   // apiV1.use('/ai-assistant', tenantMiddleware, aiAssistantRouter); // Temporarily disabled - export issue
   // apiV1.use('/e-signature/requests', tenantMiddleware, eSignatureRouter); // Protected signature request management - Temporarily disabled
   // apiV1.use('/', bookingRouter); // Booking pages (mixed public/protected - handles auth internally) - Temporarily disabled
-  apiV1.use('/test', testRouter);
+  // Test routes only available in non-production environments
+  if (config.nodeEnv !== 'production') {
+    apiV1.use('/test', testRouter);
+  }
 
   // SMS webhook (public - Fast2SMS delivery reports)
   apiV1.post('/sms/webhook/delivery', smsRouter);
@@ -264,6 +294,11 @@ export async function createServer() {
       },
     });
   });
+
+  // Sentry error handler (must be before custom error handler)
+  if (process.env.SENTRY_DSN) {
+    app.use(Sentry.expressErrorHandler());
+  }
 
   // Global error handler
   app.use(errorHandler);

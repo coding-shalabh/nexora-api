@@ -96,28 +96,43 @@ class TicketsService {
     };
   }
 
-  async createTicket(tenantId, userId, data) {
-    // Find support pipeline for this tenant
-    const supportPipeline = await prisma.pipeline.findFirst({
-      where: {
-        tenantId,
-        name: 'Support Pipeline',
-      },
-      include: {
-        stages: {
-          where: { name: 'New' },
-          take: 1,
-        },
-      },
+  async getOrCreateSupportPipeline(tenantId) {
+    let supportPipeline = await prisma.pipeline.findFirst({
+      where: { tenantId, name: 'Support Pipeline' },
+      include: { stages: { orderBy: { order: 'asc' } } },
     });
 
     if (!supportPipeline) {
-      throw new Error('Support pipeline not found. Please contact administrator.');
+      supportPipeline = await prisma.pipeline.create({
+        data: {
+          tenantId,
+          name: 'Support Pipeline',
+          type: 'TICKET',
+          stages: {
+            create: [
+              { tenantId, name: 'New', order: 1, color: '#6366f1' },
+              { tenantId, name: 'Open', order: 2, color: '#3b82f6' },
+              { tenantId, name: 'Pending', order: 3, color: '#f59e0b' },
+              { tenantId, name: 'Resolved', order: 4, color: '#10b981' },
+              { tenantId, name: 'Closed', order: 5, color: '#6b7280', isClosed: true },
+            ],
+          },
+        },
+        include: { stages: { orderBy: { order: 'asc' } } },
+      });
     }
 
-    const newStage = supportPipeline.stages[0];
+    return supportPipeline;
+  }
+
+  async createTicket(tenantId, userId, data) {
+    // Auto-create support pipeline if it doesn't exist
+    const supportPipeline = await this.getOrCreateSupportPipeline(tenantId);
+
+    const newStage =
+      supportPipeline.stages.find((s) => s.name === 'New') || supportPipeline.stages[0];
     if (!newStage) {
-      throw new Error('Support pipeline "New" stage not found.');
+      throw new Error('Support pipeline has no stages.');
     }
 
     const ticket = await prisma.ticket.create({
@@ -362,6 +377,20 @@ class TicketsService {
       console.error('Ticket stats error:', error.message);
       return { open: 0, inProgress: 0, resolved: 0, total: 0 };
     }
+  }
+
+  async deleteTicket(tenantId, ticketId) {
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: ticketId, tenantId },
+    });
+
+    if (!ticket) {
+      throw new NotFoundError('Ticket not found');
+    }
+
+    await prisma.ticket.delete({
+      where: { id: ticketId },
+    });
   }
 }
 

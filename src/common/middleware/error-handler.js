@@ -2,16 +2,40 @@ import { ZodError } from 'zod';
 import { AppError, ValidationError } from '@crm360/shared';
 import { logger } from '../logger.js';
 
+// Fields that must never appear in logs
+const SENSITIVE_FIELDS = [
+  'password',
+  'currentPassword',
+  'newPassword',
+  'passwordHash',
+  'secret',
+  'token',
+  'refreshToken',
+  'apiKey',
+  'apiSecret',
+];
+
+function redactBody(body) {
+  if (!body || typeof body !== 'object') return body;
+  const redacted = { ...body };
+  for (const field of SENSITIVE_FIELDS) {
+    if (field in redacted) redacted[field] = '[REDACTED]';
+  }
+  return redacted;
+}
+
 export function errorHandler(err, req, res, _next) {
-  // Log the error
-  logger.error({
-    err,
-    method: req.method,
-    url: req.url,
-    body: req.body,
-    params: req.params,
-    query: req.query,
-  }, 'Request error');
+  // Log the error with sensitive fields redacted
+  logger.error(
+    {
+      err,
+      method: req.method,
+      url: req.url,
+      body: redactBody(req.body),
+      params: req.params,
+    },
+    'Request error'
+  );
 
   // Handle Zod validation errors
   if (err instanceof ZodError) {
@@ -75,9 +99,7 @@ export function errorHandler(err, req, res, _next) {
     success: false,
     error: {
       code: 'INTERNAL_ERROR',
-      message: process.env.NODE_ENV === 'production'
-        ? 'An unexpected error occurred'
-        : err.message,
+      message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message,
     },
   });
 }

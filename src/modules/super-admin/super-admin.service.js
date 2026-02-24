@@ -1,16 +1,16 @@
-import { prisma } from '@crm360/database'
-import { BadRequestError, UnauthorizedError, NotFoundError } from '@crm360/shared'
+import { prisma } from '@crm360/database';
+import { BadRequestError, UnauthorizedError, NotFoundError } from '@crm360/shared';
 import {
   hashPassword,
   verifyPassword,
   generateAccessToken,
   generateRefreshToken,
   verifyToken,
-} from '../../common/auth.js'
-import { nanoid } from 'nanoid'
+} from '../../common/auth.js';
+import { nanoid } from 'nanoid';
 
 // Token expiry times
-const SESSION_EXPIRY_HOURS = 24
+const SESSION_EXPIRY_HOURS = 24;
 
 class SuperAdminService {
   /**
@@ -19,25 +19,25 @@ class SuperAdminService {
   async login(input, ipAddress, userAgent) {
     const superAdmin = await prisma.superAdmin.findUnique({
       where: { email: input.email.toLowerCase() },
-    })
+    });
 
     if (!superAdmin || !superAdmin.passwordHash) {
-      throw new UnauthorizedError('Invalid email or password')
+      throw new UnauthorizedError('Invalid email or password');
     }
 
-    const isValidPassword = await verifyPassword(input.password, superAdmin.passwordHash)
+    const isValidPassword = await verifyPassword(input.password, superAdmin.passwordHash);
 
     if (!isValidPassword) {
-      throw new UnauthorizedError('Invalid email or password')
+      throw new UnauthorizedError('Invalid email or password');
     }
 
     if (!superAdmin.isActive) {
-      throw new UnauthorizedError('Account is not active')
+      throw new UnauthorizedError('Account is not active');
     }
 
     // Create session
-    const sessionToken = nanoid(64)
-    const expiresAt = new Date(Date.now() + SESSION_EXPIRY_HOURS * 60 * 60 * 1000)
+    const sessionToken = nanoid(64);
+    const expiresAt = new Date(Date.now() + SESSION_EXPIRY_HOURS * 60 * 60 * 1000);
 
     await prisma.superAdminSession.create({
       data: {
@@ -47,7 +47,7 @@ class SuperAdminService {
         ipAddress,
         expiresAt,
       },
-    })
+    });
 
     // Update last login
     await prisma.superAdmin.update({
@@ -56,7 +56,7 @@ class SuperAdminService {
         lastLoginAt: new Date(),
         lastLoginIp: ipAddress,
       },
-    })
+    });
 
     // Log action
     await this.createAuditLog({
@@ -64,19 +64,19 @@ class SuperAdminService {
       action: 'LOGIN',
       ipAddress,
       userAgent,
-    })
+    });
 
     // Generate JWT tokens
     const tokenPayload = {
       superAdminId: superAdmin.id,
       role: superAdmin.role,
       type: 'super_admin',
-    }
+    };
 
     const [accessToken, refreshToken] = await Promise.all([
       generateAccessToken(tokenPayload),
       generateRefreshToken(tokenPayload),
-    ])
+    ]);
 
     return {
       accessToken,
@@ -91,7 +91,7 @@ class SuperAdminService {
         role: superAdmin.role,
         avatarUrl: superAdmin.avatarUrl,
       },
-    }
+    };
   }
 
   /**
@@ -101,7 +101,7 @@ class SuperAdminService {
     if (sessionToken) {
       await prisma.superAdminSession.deleteMany({
         where: { token: sessionToken },
-      })
+      });
     }
 
     await this.createAuditLog({
@@ -109,7 +109,7 @@ class SuperAdminService {
       action: 'LOGOUT',
       ipAddress,
       userAgent,
-    })
+    });
   }
 
   /**
@@ -118,10 +118,10 @@ class SuperAdminService {
   async getMe(superAdminId) {
     const superAdmin = await prisma.superAdmin.findUnique({
       where: { id: superAdminId },
-    })
+    });
 
     if (!superAdmin) {
-      throw new NotFoundError('Super admin not found')
+      throw new NotFoundError('Super admin not found');
     }
 
     return {
@@ -135,43 +135,43 @@ class SuperAdminService {
       mfaEnabled: superAdmin.mfaEnabled,
       lastLoginAt: superAdmin.lastLoginAt,
       createdAt: superAdmin.createdAt,
-    }
+    };
   }
 
   /**
    * Refresh tokens
    */
   async refreshTokens(refreshToken) {
-    const payload = await verifyToken(refreshToken)
+    const payload = await verifyToken(refreshToken);
 
     if (!payload || payload.type !== 'refresh' || !payload.superAdminId) {
-      throw new UnauthorizedError('Invalid refresh token')
+      throw new UnauthorizedError('Invalid refresh token');
     }
 
     const superAdmin = await prisma.superAdmin.findUnique({
       where: { id: payload.superAdminId },
-    })
+    });
 
     if (!superAdmin || !superAdmin.isActive) {
-      throw new UnauthorizedError('Super admin not found or inactive')
+      throw new UnauthorizedError('Super admin not found or inactive');
     }
 
     const tokenPayload = {
       superAdminId: superAdmin.id,
       role: superAdmin.role,
       type: 'super_admin',
-    }
+    };
 
     const [newAccessToken, newRefreshToken] = await Promise.all([
       generateAccessToken(tokenPayload),
       generateRefreshToken(tokenPayload),
-    ])
+    ]);
 
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
       expiresIn: 900,
-    }
+    };
   }
 
   // ==================== TENANT MANAGEMENT ====================
@@ -180,17 +180,17 @@ class SuperAdminService {
    * List all tenants with pagination
    */
   async listTenants({ page = 1, limit = 20, search, status }) {
-    const where = {}
+    const where = {};
 
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { slug: { contains: search, mode: 'insensitive' } },
-      ]
+      ];
     }
 
     if (status) {
-      where.status = status
+      where.status = status;
     }
 
     const [tenants, total] = await Promise.all([
@@ -209,7 +209,7 @@ class SuperAdminService {
         },
       }),
       prisma.tenant.count({ where }),
-    ])
+    ]);
 
     return {
       data: tenants,
@@ -219,7 +219,7 @@ class SuperAdminService {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    }
+    };
   }
 
   /**
@@ -248,15 +248,15 @@ class SuperAdminService {
             createdAt: true,
           },
         },
-        wallet: true,
+        wallets: true,
       },
-    })
+    });
 
     if (!tenant) {
-      throw new NotFoundError('Tenant not found')
+      throw new NotFoundError('Tenant not found');
     }
 
-    return tenant
+    return tenant;
   }
 
   /**
@@ -270,7 +270,7 @@ class SuperAdminService {
         status: data.status,
         settings: data.settings,
       },
-    })
+    });
 
     await this.createAuditLog({
       superAdminId,
@@ -280,9 +280,9 @@ class SuperAdminService {
       details: data,
       ipAddress,
       userAgent,
-    })
+    });
 
-    return tenant
+    return tenant;
   }
 
   /**
@@ -299,7 +299,7 @@ class SuperAdminService {
           suspendedBy: superAdminId,
         },
       },
-    })
+    });
 
     await this.createAuditLog({
       superAdminId,
@@ -309,9 +309,9 @@ class SuperAdminService {
       details: { reason },
       ipAddress,
       userAgent,
-    })
+    });
 
-    return tenant
+    return tenant;
   }
 
   /**
@@ -321,7 +321,7 @@ class SuperAdminService {
     const tenant = await prisma.tenant.update({
       where: { id: tenantId },
       data: { status: 'ACTIVE' },
-    })
+    });
 
     await this.createAuditLog({
       superAdminId,
@@ -330,9 +330,9 @@ class SuperAdminService {
       entityId: tenantId,
       ipAddress,
       userAgent,
-    })
+    });
 
-    return tenant
+    return tenant;
   }
 
   // ==================== PLATFORM ANALYTICS ====================
@@ -341,28 +341,23 @@ class SuperAdminService {
    * Get platform overview stats
    */
   async getPlatformStats() {
-    const [
-      totalTenants,
-      activeTenants,
-      totalUsers,
-      totalWorkspaces,
-      recentTenants,
-    ] = await Promise.all([
-      prisma.tenant.count(),
-      prisma.tenant.count({ where: { status: 'ACTIVE' } }),
-      prisma.user.count(),
-      prisma.workspace.count(),
-      prisma.tenant.findMany({
-        take: 5,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          createdAt: true,
-        },
-      }),
-    ])
+    const [totalTenants, activeTenants, totalUsers, totalWorkspaces, recentTenants] =
+      await Promise.all([
+        prisma.tenant.count(),
+        prisma.tenant.count({ where: { status: 'ACTIVE' } }),
+        prisma.user.count(),
+        prisma.workspace.count(),
+        prisma.tenant.findMany({
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            createdAt: true,
+          },
+        }),
+      ]);
 
     return {
       tenants: {
@@ -373,7 +368,7 @@ class SuperAdminService {
       users: { total: totalUsers },
       workspaces: { total: totalWorkspaces },
       recentTenants,
-    }
+    };
   }
 
   // ==================== SUPER ADMIN MANAGEMENT ====================
@@ -399,7 +394,7 @@ class SuperAdminService {
         },
       }),
       prisma.superAdmin.count(),
-    ])
+    ]);
 
     return {
       data: admins,
@@ -409,7 +404,7 @@ class SuperAdminService {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    }
+    };
   }
 
   /**
@@ -418,13 +413,13 @@ class SuperAdminService {
   async createSuperAdmin(data, creatorId, ipAddress, userAgent) {
     const existing = await prisma.superAdmin.findUnique({
       where: { email: data.email.toLowerCase() },
-    })
+    });
 
     if (existing) {
-      throw new BadRequestError('Email already registered')
+      throw new BadRequestError('Email already registered');
     }
 
-    const passwordHash = await hashPassword(data.password)
+    const passwordHash = await hashPassword(data.password);
 
     const superAdmin = await prisma.superAdmin.create({
       data: {
@@ -435,7 +430,7 @@ class SuperAdminService {
         role: data.role || 'ADMIN',
         permissions: data.permissions,
       },
-    })
+    });
 
     await this.createAuditLog({
       superAdminId: creatorId,
@@ -445,7 +440,7 @@ class SuperAdminService {
       details: { email: superAdmin.email, role: superAdmin.role },
       ipAddress,
       userAgent,
-    })
+    });
 
     return {
       id: superAdmin.id,
@@ -453,29 +448,29 @@ class SuperAdminService {
       firstName: superAdmin.firstName,
       lastName: superAdmin.lastName,
       role: superAdmin.role,
-    }
+    };
   }
 
   /**
    * Update super admin
    */
   async updateSuperAdmin(adminId, data, updaterId, ipAddress, userAgent) {
-    const updates = {}
+    const updates = {};
 
-    if (data.firstName) updates.firstName = data.firstName
-    if (data.lastName) updates.lastName = data.lastName
-    if (data.role) updates.role = data.role
-    if (data.isActive !== undefined) updates.isActive = data.isActive
-    if (data.permissions) updates.permissions = data.permissions
+    if (data.firstName) updates.firstName = data.firstName;
+    if (data.lastName) updates.lastName = data.lastName;
+    if (data.role) updates.role = data.role;
+    if (data.isActive !== undefined) updates.isActive = data.isActive;
+    if (data.permissions) updates.permissions = data.permissions;
 
     if (data.password) {
-      updates.passwordHash = await hashPassword(data.password)
+      updates.passwordHash = await hashPassword(data.password);
     }
 
     const superAdmin = await prisma.superAdmin.update({
       where: { id: adminId },
       data: updates,
-    })
+    });
 
     await this.createAuditLog({
       superAdminId: updaterId,
@@ -485,7 +480,7 @@ class SuperAdminService {
       details: { ...data, password: data.password ? '[REDACTED]' : undefined },
       ipAddress,
       userAgent,
-    })
+    });
 
     return {
       id: superAdmin.id,
@@ -494,7 +489,7 @@ class SuperAdminService {
       lastName: superAdmin.lastName,
       role: superAdmin.role,
       isActive: superAdmin.isActive,
-    }
+    };
   }
 
   // ==================== AUDIT LOGS ====================
@@ -502,8 +497,16 @@ class SuperAdminService {
   /**
    * Create audit log entry
    */
-  async createAuditLog({ superAdminId, action, entityType, entityId, details, ipAddress, userAgent }) {
-    return prisma.platformAuditLog.create({
+  async createAuditLog({
+    superAdminId,
+    action,
+    entityType,
+    entityId,
+    details,
+    ipAddress,
+    userAgent,
+  }) {
+    return prisma.platform_audit_logs.create({
       data: {
         superAdminId,
         action,
@@ -513,21 +516,21 @@ class SuperAdminService {
         ipAddress,
         userAgent,
       },
-    })
+    });
   }
 
   /**
    * Get audit logs
    */
   async getAuditLogs({ page = 1, limit = 50, action, superAdminId, entityType }) {
-    const where = {}
+    const where = {};
 
-    if (action) where.action = action
-    if (superAdminId) where.superAdminId = superAdminId
-    if (entityType) where.entityType = entityType
+    if (action) where.action = action;
+    if (superAdminId) where.superAdminId = superAdminId;
+    if (entityType) where.entityType = entityType;
 
     const [logs, total] = await Promise.all([
-      prisma.platformAuditLog.findMany({
+      prisma.platform_audit_logs.findMany({
         where,
         skip: (page - 1) * limit,
         take: limit,
@@ -543,8 +546,8 @@ class SuperAdminService {
           },
         },
       }),
-      prisma.platformAuditLog.count({ where }),
-    ])
+      prisma.platform_audit_logs.count({ where }),
+    ]);
 
     return {
       data: logs,
@@ -554,8 +557,8 @@ class SuperAdminService {
         total,
         totalPages: Math.ceil(total / limit),
       },
-    }
+    };
   }
 }
 
-export const superAdminService = new SuperAdminService()
+export const superAdminService = new SuperAdminService();

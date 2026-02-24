@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { tenantMiddleware } from '../../common/middleware/tenant.js';
 import { tenantService } from './tenant.service.js';
 import { featureAccessService } from './feature-access.service.js';
+import { getStorageStats } from '../../common/middleware/storage-quota.js';
 
 const router = Router();
 
@@ -116,6 +117,20 @@ router.get('/access/limit/:limitType', async (req, res, next) => {
         limit: req.params.limitType,
         ...limitCheck,
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Get storage usage statistics
+router.get('/storage/stats', async (req, res, next) => {
+  try {
+    const stats = await getStorageStats(req.tenantId);
+
+    res.json({
+      success: true,
+      data: stats,
     });
   } catch (error) {
     next(error);

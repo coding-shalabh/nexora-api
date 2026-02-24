@@ -68,7 +68,7 @@ class QuotesService {
     const unitPrice = Number(line.unitPrice);
     const discountPercent = Number(line.discountPercent || 0);
     const discountAmount = Number(line.discountAmount || 0);
-    const taxRate = Number(line.taxRate || 0);
+    const taxRate = Number(line.taxRate || line.gstRate || 0);
 
     // Calculate base amount
     const baseAmount = quantity * unitPrice;
@@ -110,7 +110,19 @@ class QuotesService {
     const totalPrice = taxableValue + totalTax;
 
     return {
-      ...line,
+      id: line.id,
+      description: line.description,
+      quantity,
+      unitPrice,
+      taxRate,
+      discountPercent,
+      order: line.order,
+      hsnCode: line.hsnCode || null,
+      sacCode: line.sacCode || null,
+      unit: line.unit || null,
+      productType: line.sacCode ? 'SERVICES' : 'GOODS',
+      isTaxExempt: line.isTaxExempt || false,
+      exemptReason: line.exemptReason || null,
       taxableValue,
       discountAmount: totalDiscount,
       totalPrice,
@@ -130,19 +142,43 @@ class QuotesService {
    * Get all quotes with filters and pagination
    */
   async getQuotes(tenantId, filters = {}) {
-    // TODO: Quotes feature not yet implemented - Quote model doesn't exist
-    // Return empty data with proper structure
     const page = filters.page || 1;
     const limit = filters.limit || 25;
+    const where = { tenantId };
+
+    if (filters.status) where.status = filters.status;
+    if (filters.contactId) where.contactId = filters.contactId;
+    if (filters.search) {
+      where.OR = [
+        { quoteNumber: { contains: filters.search, mode: 'insensitive' } },
+        { contact: { firstName: { contains: filters.search, mode: 'insensitive' } } },
+        { contact: { lastName: { contains: filters.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [quotes, total] = await Promise.all([
+      prisma.quote.findMany({
+        where,
+        include: {
+          lines: true,
+          contact: { select: { id: true, firstName: true, lastName: true, email: true } },
+          deal: { select: { id: true, name: true } },
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.quote.count({ where }),
+    ]);
 
     return {
       success: true,
-      data: [],
+      data: quotes,
       meta: {
-        total: 0,
+        total,
         page,
         limit,
-        totalPages: 0,
+        totalPages: Math.ceil(total / limit),
       },
     };
   }
@@ -151,17 +187,24 @@ class QuotesService {
    * Get quote statistics
    */
   async getQuoteStats(tenantId) {
-    // TODO: Quotes feature not yet implemented - Quote model doesn't exist
-    // Return empty stats with proper structure
+    const [total, drafts, sent, accepted, pending, totalValueResult] = await Promise.all([
+      prisma.quote.count({ where: { tenantId } }),
+      prisma.quote.count({ where: { tenantId, status: 'DRAFT' } }),
+      prisma.quote.count({ where: { tenantId, status: 'SENT' } }),
+      prisma.quote.count({ where: { tenantId, status: 'ACCEPTED' } }),
+      prisma.quote.count({ where: { tenantId, status: { in: ['DRAFT', 'SENT'] } } }),
+      prisma.quote.aggregate({ where: { tenantId }, _sum: { totalAmount: true } }),
+    ]);
+
     return {
       success: true,
       data: {
-        total: 0,
-        drafts: 0,
-        sent: 0,
-        accepted: 0,
-        pending: 0,
-        totalValue: 0,
+        total,
+        drafts,
+        sent,
+        accepted,
+        pending,
+        totalValue: totalValueResult._sum.totalAmount || 0,
       },
     };
   }
@@ -187,7 +230,7 @@ class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     return {
@@ -230,19 +273,19 @@ class QuotesService {
         issueDate: new Date(),
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         currency: data.currency || 'USD',
-        notes: data.notes,
-        terms: data.terms,
+        notes: data.notes || null,
+        terms: data.terms || null,
         isGstQuote: data.isGstQuote || false,
         supplyType: data.supplyType || 'B2B',
-        sellerGstin: data.sellerGstin,
-        sellerLegalName: data.sellerLegalName,
-        sellerAddress: data.sellerAddress,
-        sellerStateCode: data.sellerStateCode,
-        buyerGstin: data.buyerGstin,
-        buyerLegalName: data.buyerLegalName,
-        buyerAddress: data.buyerAddress,
-        buyerStateCode: data.buyerStateCode,
-        placeOfSupply: data.placeOfSupply,
+        sellerGstin: data.sellerGstin || null,
+        sellerLegalName: data.sellerLegalName || null,
+        sellerAddress: data.sellerAddress || null,
+        sellerStateCode: data.sellerStateCode || null,
+        buyerGstin: data.buyerGstin || null,
+        buyerLegalName: data.buyerLegalName || null,
+        buyerAddress: data.buyerAddress || null,
+        buyerStateCode: data.buyerStateCode || null,
+        placeOfSupply: data.placeOfSupply || null,
         isInterState: data.isInterState || false,
         isReverseCharge: data.isReverseCharge || false,
         createdById: userId,
@@ -276,7 +319,7 @@ class QuotesService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     const quote = await prisma.quote.update({
@@ -310,7 +353,7 @@ class QuotesService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     await prisma.quote.delete({
@@ -332,7 +375,7 @@ class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     const updated = await prisma.quote.update({
@@ -364,7 +407,7 @@ class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     const updated = await prisma.quote.update({
@@ -397,7 +440,7 @@ class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     const updated = await prisma.quote.update({
@@ -432,7 +475,7 @@ class QuotesService {
     });
 
     if (!original) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     const quoteNumber = await this.generateQuoteNumber(tenantId);
@@ -524,7 +567,7 @@ class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     // Process new line items
@@ -583,7 +626,7 @@ class QuotesService {
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     // Delete line item

@@ -416,13 +416,22 @@ router.post('/complete', verifyOnboardingToken, async (req, res) => {
 /**
  * Add user to tenant (for seeding/testing)
  * POST /api/v1/onboarding/add-user
+ * SECURITY: Only available in non-production environments
  */
 router.post('/add-user', async (req, res) => {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'The requested resource was not found' },
+      });
+    }
+
     const { secret, tenantId, workspaceId, email, firstName, lastName, password, roleName } =
       req.body;
 
-    if (secret !== 'NEXORA_SEED_2026') {
+    const seedSecret = process.env.SEED_SECRET || 'NEXORA_SEED_2026';
+    if (secret !== seedSecret) {
       return res.status(403).json({ success: false, error: { message: 'Invalid secret' } });
     }
 
@@ -479,12 +488,23 @@ router.post('/add-user', async (req, res) => {
 /**
  * Update user role (for seeding/testing)
  * POST /api/v1/onboarding/update-role
+ * SECURITY: Only available in non-production environments
  */
 router.post('/update-role', async (req, res) => {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      return res
+        .status(404)
+        .json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'The requested resource was not found' },
+        });
+    }
+
     const { secret, tenantId, email, roleName } = req.body;
 
-    if (secret !== 'NEXORA_SEED_2026') {
+    const seedSecret = process.env.SEED_SECRET || 'NEXORA_SEED_2026';
+    if (secret !== seedSecret) {
       return res.status(403).json({ success: false, error: { message: 'Invalid secret' } });
     }
 

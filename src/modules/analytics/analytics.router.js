@@ -8,7 +8,7 @@ import { analyticsService } from './analytics.service.js';
 const router = Router();
 
 // IP API Configuration
-const IPAPI_KEY = process.env.IPAPI_KEY || 'a40190664a200f86c6a6';
+const IPAPI_KEY = process.env.IPAPI_KEY || '';
 const IPAPI_BASE_URL = 'https://api.ipapi.is';
 
 // Create axios instance with custom HTTPS agent for better Windows TLS compatibility

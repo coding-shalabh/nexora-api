@@ -8,35 +8,62 @@ import {
   MICROSOFT_OAUTH_CONFIG,
 } from '../../config/email-providers.js';
 
-// Simple encryption for storing tokens/passwords
+// Encryption for storing tokens/passwords
+// ENCRYPTION_KEY must be set in production — falling back to JWT_SECRET is insecure
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.JWT_SECRET;
+if (!ENCRYPTION_KEY) {
+  throw new Error('ENCRYPTION_KEY or JWT_SECRET must be set for email credential encryption');
+}
+if (!process.env.ENCRYPTION_KEY && process.env.NODE_ENV === 'production') {
+  throw new Error('ENCRYPTION_KEY must be set in production (do not fall back to JWT_SECRET)');
+}
 const ALGORITHM = 'aes-256-gcm';
 
 function encrypt(text) {
   if (!text) return null;
+  const salt = crypto.randomBytes(16);
   const iv = crypto.randomBytes(16);
-  const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
+  const key = crypto.scryptSync(ENCRYPTION_KEY, salt, 32);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
   const authTag = cipher.getAuthTag();
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
+  return `${salt.toString('hex')}:${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted}`;
 }
 
 function decrypt(encryptedText) {
   if (!encryptedText) return null;
   try {
-    const [ivHex, authTagHex, encrypted] = encryptedText.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const authTag = Buffer.from(authTagHex, 'hex');
-    const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
+    const parts = encryptedText.split(':');
+    let salt, iv, authTag, encrypted;
+
+    if (parts.length === 4) {
+      // New format: salt:iv:authTag:encrypted (random salt per encryption)
+      [salt, iv, authTag, encrypted] = [
+        Buffer.from(parts[0], 'hex'),
+        Buffer.from(parts[1], 'hex'),
+        Buffer.from(parts[2], 'hex'),
+        parts[3],
+      ];
+    } else if (parts.length === 3) {
+      // Legacy format: iv:authTag:encrypted (static salt — backwards compatible)
+      salt = Buffer.from('salt');
+      [iv, authTag, encrypted] = [
+        Buffer.from(parts[0], 'hex'),
+        Buffer.from(parts[1], 'hex'),
+        parts[2],
+      ];
+    } else {
+      return null;
+    }
+
+    const key = crypto.scryptSync(ENCRYPTION_KEY, salt, 32);
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     decipher.setAuthTag(authTag);
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
-  } catch (error) {
-    console.error('Decryption failed:', error);
+  } catch {
     return null;
   }
 }

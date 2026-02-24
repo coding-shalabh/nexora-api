@@ -1,0 +1,6 @@
+id: "openbug-service"
+description: "Express.js REST API, port 4000, Prisma ORM + PostgreSQL, JWT auth, multi-tenant middleware, /api/v1/* routes"
+name: "Nexora API"
+window_id: 1771508820616
+logs_available: true
+code_available: true

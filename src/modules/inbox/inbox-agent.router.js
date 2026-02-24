@@ -106,6 +106,13 @@ router.patch('/canned-responses/categories/:id', async (req, res, next) => {
       })
       .parse(req.body);
 
+    // Verify tenant ownership before updating
+    const existing = await prisma.cannedResponseCategory.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId },
+    });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Category not found' });
+    }
     const category = await prisma.cannedResponseCategory.update({
       where: { id: req.params.id },
       data,
@@ -344,6 +351,13 @@ router.patch('/canned-responses/:id', async (req, res, next) => {
  */
 router.delete('/canned-responses/:id', async (req, res, next) => {
   try {
+    // Verify tenant ownership before deleting
+    const existing = await prisma.cannedResponse.findFirst({
+      where: { id: req.params.id, tenantId: req.tenantId },
+    });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Canned response not found' });
+    }
     await prisma.cannedResponse.delete({
       where: { id: req.params.id },
     });
@@ -495,6 +509,13 @@ router.patch('/conversations/:threadId/notes/:noteId', async (req, res, next) =>
       })
       .parse(req.body);
 
+    // Verify tenant ownership before updating
+    const existingNote = await prisma.conversation_notes.findFirst({
+      where: { id: req.params.noteId, tenantId: req.tenantId },
+    });
+    if (!existingNote) {
+      return res.status(404).json({ success: false, error: 'Note not found' });
+    }
     const note = await prisma.conversation_notes.update({
       where: { id: req.params.noteId },
       data,
@@ -527,98 +548,7 @@ router.delete('/conversations/:threadId/notes/:noteId', async (req, res, next) =
   }
 });
 
-// ============================================================================
-// SNOOZE
-// ============================================================================
-
-/**
- * Snooze a conversation
- */
-router.post('/conversations/:id/snooze', async (req, res, next) => {
-  try {
-    const data = z
-      .object({
-        duration: z.enum(['1h', '3h', '24h', '3d', '1w', 'custom']),
-        customUntil: z.string().datetime().optional(),
-        reason: z.string().optional(),
-      })
-      .parse(req.body);
-
-    let snoozedUntil;
-    const now = new Date();
-
-    switch (data.duration) {
-      case '1h':
-        snoozedUntil = new Date(now.getTime() + 60 * 60 * 1000);
-        break;
-      case '3h':
-        snoozedUntil = new Date(now.getTime() + 3 * 60 * 60 * 1000);
-        break;
-      case '24h':
-        snoozedUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-        break;
-      case '3d':
-        snoozedUntil = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-        break;
-      case '1w':
-        snoozedUntil = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'custom':
-        if (!data.customUntil) {
-          return res.status(400).json({
-            success: false,
-            error: 'INVALID_DURATION',
-            message: 'Custom duration requires customUntil date',
-          });
-        }
-        snoozedUntil = new Date(data.customUntil);
-        break;
-    }
-
-    const thread = await prisma.conversation.update({
-      where: { id: req.params.id },
-      data: {
-        status: 'SNOOZED',
-        snoozedUntil,
-        snoozedAt: now,
-        snoozedById: req.userId,
-        snoozeReason: data.reason,
-      },
-    });
-
-    res.json({
-      success: true,
-      data: thread,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-/**
- * Unsnooze a conversation
- */
-router.post('/conversations/:id/unsnooze', async (req, res, next) => {
-  try {
-    const thread = await prisma.conversation.update({
-      where: { id: req.params.id },
-      data: {
-        status: 'OPEN',
-        snoozedUntil: null,
-        snoozedAt: null,
-        snoozedById: null,
-        snoozeReason: null,
-      },
-    });
-
-    res.json({
-      success: true,
-      data: thread,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
+// Snooze routes moved to inbox.router.js (proper service layer with tenant isolation)
 
 // ============================================================================
 // TEAM ASSIGNMENT

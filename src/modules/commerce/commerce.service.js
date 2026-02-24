@@ -287,12 +287,12 @@ export const commerceService = {
     const invoices = await prisma.invoice.findMany({
       where,
       select: {
-        total: true,
+        totalAmount: true,
         createdAt: true,
       },
     });
 
-    const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+    const totalRevenue = invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
     const invoiceCount = invoices.length;
     const avgInvoiceValue = invoiceCount > 0 ? totalRevenue / invoiceCount : 0;
 
@@ -322,7 +322,7 @@ export const commerceService = {
     const invoices = await prisma.invoice.findMany({
       where,
       select: {
-        total: true,
+        totalAmount: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'asc' },
@@ -335,7 +335,7 @@ export const commerceService = {
       if (!breakdown[key]) {
         breakdown[key] = { period: key, revenue: 0, count: 0 };
       }
-      breakdown[key].revenue += inv.total || 0;
+      breakdown[key].revenue += inv.totalAmount || 0;
       breakdown[key].count += 1;
     });
 
@@ -407,7 +407,7 @@ export const commerceService = {
         receiptNumber: `RCP-${p.id.substring(0, 8).toUpperCase()}`,
         invoiceNumber: p.invoice?.invoiceNumber,
         amount: p.amount,
-        paymentMethod: p.paymentMethod,
+        paymentMethod: p.method,
         status: p.status,
         customer: p.invoice?.contact
           ? `${p.invoice.contact.firstName} ${p.invoice.contact.lastName}`

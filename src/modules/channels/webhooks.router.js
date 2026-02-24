@@ -70,7 +70,7 @@ router.post('/msg91/whatsapp', async (req, res) => {
     const { prisma } = await import('@crm360/database');
     const channelAccount = await prisma.channelAccount.findFirst({
       where: {
-        channelType: 'WHATSAPP',
+        type: 'WHATSAPP',
         phoneNumber: integratedNumber.replace(/^\+/, ''), // Remove leading +
         status: 'ACTIVE',
       },
@@ -80,7 +80,7 @@ router.post('/msg91/whatsapp', async (req, res) => {
       // Try without country code normalization
       const altAccount = await prisma.channelAccount.findFirst({
         where: {
-          channelType: 'WHATSAPP',
+          type: 'WHATSAPP',
           phoneNumber: { contains: integratedNumber.slice(-10) },
           status: 'ACTIVE',
         },
@@ -527,6 +527,17 @@ async function processMsg91Webhook(channelAccount, payload, prisma, logger) {
         unreadCount: 1,
       },
     });
+    // Create matching ConversationThread with same ID (message_events FK needs this)
+    await prisma.conversationThread.create({
+      data: {
+        id: thread.id,
+        tenantId,
+        contactId: contact.id,
+        contactPhone: normalizedPhone,
+        status: 'OPEN',
+        lastMessageChannel: 'WHATSAPP',
+      },
+    });
     isNewThread = true;
     logger.info({ threadId: thread.id, phone: normalizedPhone }, 'Conversation thread created');
   }
@@ -648,19 +659,18 @@ async function processMsg91Webhook(channelAccount, payload, prisma, logger) {
       dbContentType = 'TEXT';
   }
 
-  // Create message in conversation thread
-  const messageRecord = await prisma.conversationThread.create({
+  // Create message in message_events (unified message store)
+  const messageRecord = await prisma.message_events.create({
     data: {
       tenantId,
-      conversationId: thread.id,
+      threadId: thread.id,
       channelAccountId: channelAccount.id,
       channel: 'WHATSAPP',
       direction: 'INBOUND',
-      externalId: msgUuid,
-      contentType: dbContentType.toLowerCase(),
+      providerMessageId: msgUuid,
+      contentType: dbContentType,
       textContent,
-      content: textContent,
-      // status uses default OPEN from schema - not message delivery status
+      status: 'DELIVERED',
       sentAt: msgTimestamp,
       deliveredAt: new Date(),
       metadata: {
@@ -670,7 +680,6 @@ async function processMsg91Webhook(channelAccount, payload, prisma, logger) {
         filename: mediaFilename,
         mediaUrl,
         mediaType,
-        raw: payload,
       },
     },
   });
@@ -722,7 +731,7 @@ async function processMsg91Webhook(channelAccount, payload, prisma, logger) {
   // Broadcast message via WebSocket for real-time updates
   try {
     broadcastNewMessage({
-      id: messageEvent.id,
+      id: messageRecord.id,
       tenantId,
       threadId: thread.id,
       direction: 'inbound',
@@ -828,6 +837,17 @@ async function processNestedMessage(channelAccount, msg, contactName, prisma, lo
         unreadCount: 1,
       },
     });
+    // Create matching ConversationThread with same ID
+    await prisma.conversationThread.create({
+      data: {
+        id: thread.id,
+        tenantId,
+        contactId: contact.id,
+        contactPhone: normalizedPhone,
+        status: 'OPEN',
+        lastMessageChannel: 'WHATSAPP',
+      },
+    });
   }
 
   const msgType = (msg.type || 'text').toLowerCase();
@@ -857,21 +877,20 @@ async function processNestedMessage(channelAccount, msg, contactName, prisma, lo
     dbContentType = 'LOCATION';
   } else textContent = `[${msgType}]`;
 
-  await prisma.conversationThread.create({
+  await prisma.message_events.create({
     data: {
       tenantId,
-      conversationId: thread.id,
+      threadId: thread.id,
       channelAccountId: channelAccount.id,
       channel: 'WHATSAPP',
       direction: 'INBOUND',
-      externalId: msg.id,
-      contentType: dbContentType.toLowerCase(),
+      providerMessageId: msg.id,
+      contentType: dbContentType,
       textContent,
-      content: textContent,
-      // status uses default OPEN from schema
+      status: 'DELIVERED',
       sentAt: msg.timestamp ? new Date(parseInt(msg.timestamp) * 1000) : new Date(),
       deliveredAt: new Date(),
-      metadata: { contactName, mediaUrl, raw: msg },
+      metadata: { contactName, mediaUrl },
     },
   });
 

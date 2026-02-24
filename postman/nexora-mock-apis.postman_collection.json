@@ -1,0 +1,1990 @@
+{
+  "info": {
+    "_postman_id": "nexora-mock-apis-v1",
+    "name": "Nexora CRM360 — Mock APIs",
+    "description": "Complete mock API collection for Nexora CRM360 development.\n\nCovers: MSG91 WhatsApp, MSG91 SMS, Fast2SMS, TeleCMI Voice, Resend Email, and AI Services.\n\nSetup: Import → Create Mock Server → Copy URL → Paste in Settings → Integrations → Postman.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "mockBaseUrl",
+      "value": "{{url}}"
+    },
+    {
+      "key": "authKey",
+      "value": "mock-auth-key-nexora-dev"
+    },
+    {
+      "key": "integratedNumber",
+      "value": "919876500001"
+    },
+    {
+      "key": "recipientNumber",
+      "value": "919876543201"
+    }
+  ],
+  "item": [
+    {
+      "name": "MSG91 WhatsApp",
+      "description": "WhatsApp Business API endpoints (MSG91 format)",
+      "item": [
+        {
+          "name": "Send Text Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"content_type\": \"text\",\n  \"recipient_number\": \"{{recipientNumber}}\",\n  \"text\": \"Hello! Thank you for contacting Nexora. How can we help you today?\"\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/whatsapp/whatsapp-outbound-message/",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "whatsapp",
+                "whatsapp-outbound-message",
+                ""
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"message\": \"Message sent successfully\",\n  \"request_id\": \"mock-wa-msg-a1b2c3d4e5\",\n  \"data\": {\n    \"message_uuid\": \"mock-uuid-wa-001\",\n    \"id\": \"wamid.mock001\"\n  }\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/whatsapp/whatsapp-outbound-message/",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "whatsapp",
+                    "whatsapp-outbound-message",
+                    ""
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"content_type\": \"text\",\n  \"recipient_number\": \"{{recipientNumber}}\",\n  \"text\": \"Hello! Thank you for contacting Nexora. How can we help you today?\"\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Send Bulk/Template Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"content_type\": \"template\",\n  \"payload\": {\n    \"type\": \"template\",\n    \"template\": {\n      \"name\": \"order_confirmation\",\n      \"language\": { \"code\": \"en\", \"policy\": \"deterministic\" },\n      \"to_and_components\": [{\n        \"to\": [\"{{recipientNumber}}\"],\n        \"components\": {\n          \"body\": [{ \"type\": \"text\", \"text\": \"ORD-2024-1234\" }]\n        }\n      }]\n    },\n    \"messaging_product\": \"whatsapp\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "whatsapp",
+                "whatsapp-outbound-message",
+                "bulk",
+                ""
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"message\": \"Bulk message sent successfully\",\n  \"request_id\": \"mock-wa-bulk-f6g7h8i9j0\",\n  \"data\": {\n    \"id\": \"wamid.mock-bulk-001\"\n  }\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/whatsapp/whatsapp-outbound-message/bulk/",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "whatsapp",
+                    "whatsapp-outbound-message",
+                    "bulk",
+                    ""
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"content_type\": \"template\",\n  \"payload\": {\n    \"type\": \"template\",\n    \"template\": {\n      \"name\": \"order_confirmation\",\n      \"language\": { \"code\": \"en\", \"policy\": \"deterministic\" },\n      \"to_and_components\": [{\n        \"to\": [\"{{recipientNumber}}\"],\n        \"components\": {\n          \"body\": [{ \"type\": \"text\", \"text\": \"ORD-2024-1234\" }]\n        }\n      }]\n    },\n    \"messaging_product\": \"whatsapp\"\n  }\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Integrated Numbers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/whatsapp/whatsapp-activation/",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "whatsapp",
+                "whatsapp-activation",
+                ""
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"data\": [\n    {\n      \"id\": \"mock-num-001\",\n      \"integrated_number\": \"+919876500001\",\n      \"number\": \"919876500001\",\n      \"business_name\": \"Nexora Technologies Pvt Ltd\",\n      \"verified\": true,\n      \"status\": \"ACTIVE\",\n      \"quality_rating\": \"GREEN\"\n    },\n    {\n      \"id\": \"mock-num-002\",\n      \"integrated_number\": \"+919876500002\",\n      \"number\": \"919876500002\",\n      \"business_name\": \"Nexora Support\",\n      \"verified\": true,\n      \"status\": \"ACTIVE\",\n      \"quality_rating\": \"GREEN\"\n    }\n  ]\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/whatsapp/whatsapp-activation/",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "whatsapp",
+                    "whatsapp-activation",
+                    ""
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Templates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/whatsapp/get-template-client/{{integratedNumber}}",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "whatsapp",
+                "get-template-client",
+                "{{integratedNumber}}"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"data\": [\n    {\n      \"id\": \"tmpl-001\",\n      \"name\": \"welcome_message\",\n      \"category\": \"UTILITY\",\n      \"languages\": [{ \"language\": \"en\", \"status\": \"APPROVED\", \"code\": \"Welcome to {{1}}! We're excited to have you on board.\", \"variables\": [\"company_name\"] }]\n    },\n    {\n      \"id\": \"tmpl-002\",\n      \"name\": \"order_confirmation\",\n      \"category\": \"UTILITY\",\n      \"languages\": [{ \"language\": \"en\", \"status\": \"APPROVED\", \"code\": \"Your order {{1}} has been confirmed. Expected delivery: {{2}}.\", \"variables\": [\"order_id\", \"delivery_date\"] }]\n    },\n    {\n      \"id\": \"tmpl-003\",\n      \"name\": \"payment_receipt\",\n      \"category\": \"UTILITY\",\n      \"languages\": [{ \"language\": \"en\", \"status\": \"APPROVED\", \"code\": \"Payment of ₹{{1}} received. Transaction ID: {{2}}. Thank you!\", \"variables\": [\"amount\", \"txn_id\"] }]\n    },\n    {\n      \"id\": \"tmpl-004\",\n      \"name\": \"appointment_reminder\",\n      \"category\": \"UTILITY\",\n      \"languages\": [{ \"language\": \"en\", \"status\": \"APPROVED\", \"code\": \"Reminder: Your appointment with {{1}} is scheduled for {{2}} at {{3}}.\", \"variables\": [\"agent_name\", \"date\", \"time\"] }]\n    },\n    {\n      \"id\": \"tmpl-005\",\n      \"name\": \"shipping_update\",\n      \"category\": \"UTILITY\",\n      \"languages\": [{ \"language\": \"en\", \"status\": \"APPROVED\", \"code\": \"Your order {{1}} has been shipped! Track: {{2}}\", \"variables\": [\"order_id\", \"tracking_url\"] }]\n    },\n    {\n      \"id\": \"tmpl-006\",\n      \"name\": \"feedback_request\",\n      \"category\": \"MARKETING\",\n      \"languages\": [{ \"language\": \"en\", \"status\": \"APPROVED\", \"code\": \"Hi {{1}}, how was your experience with us? Rate 1-5: \", \"variables\": [\"customer_name\"] }]\n    },\n    {\n      \"id\": \"tmpl-007\",\n      \"name\": \"support_ticket_update\",\n      \"category\": \"UTILITY\",\n      \"languages\": [{ \"language\": \"en\", \"status\": \"APPROVED\", \"code\": \"Ticket #{{1}} update: {{2}}. Agent: {{3}}\", \"variables\": [\"ticket_id\", \"status\", \"agent_name\"] }]\n    },\n    {\n      \"id\": \"tmpl-008\",\n      \"name\": \"promotional_offer\",\n      \"category\": \"MARKETING\",\n      \"languages\": [{ \"language\": \"en\", \"status\": \"APPROVED\", \"code\": \"🎉 Exclusive for you, {{1}}! Get {{2}}% off on your next purchase. Use code: {{3}}\", \"variables\": [\"customer_name\", \"discount\", \"code\"] }]\n    }\n  ]\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/whatsapp/get-template-client/{{integratedNumber}}",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "whatsapp",
+                    "get-template-client",
+                    "{{integratedNumber}}"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Create Template",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"template_name\": \"new_template\",\n  \"language\": \"en\",\n  \"category\": \"MARKETING\",\n  \"components\": []\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/whatsapp/client-panel-template/",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "whatsapp",
+                "client-panel-template",
+                ""
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"template_id\": \"mock-tmpl-new-k1l2m3\",\n  \"message\": \"Template created, pending WhatsApp approval\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/whatsapp/client-panel-template/",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "whatsapp",
+                    "client-panel-template",
+                    ""
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"template_name\": \"new_template\",\n  \"language\": \"en\",\n  \"category\": \"MARKETING\",\n  \"components\": []\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/user/balance/",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "user",
+                "balance",
+                ""
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"balance\": 15000,\n  \"currency\": \"INR\",\n  \"plan\": \"Business Pro\",\n  \"usage\": {\n    \"whatsapp\": 2340,\n    \"sms\": 1250,\n    \"voice\": 48\n  }\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/user/balance/",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "user",
+                    "balance",
+                    ""
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Voice Call Settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"voice_enabled\": true\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/whatsapp/integrated-number/call-settings/",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "whatsapp",
+                "integrated-number",
+                "call-settings",
+                ""
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"voice_enabled\": true,\n  \"message\": \"Voice calling settings updated\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/whatsapp/integrated-number/call-settings/",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "whatsapp",
+                    "integrated-number",
+                    "call-settings",
+                    ""
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"voice_enabled\": true\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "WhatsApp Send Template (Adapter)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"content_type\": \"template\",\n  \"recipient\": \"{{recipientNumber}}\",\n  \"template\": { \"id\": \"tmpl-001\", \"components\": [] }\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/whatsapp/sendTemplate",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "whatsapp",
+                "sendTemplate"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"messageId\": \"mock-adapter-tmpl-001\",\n  \"message\": \"Template sent successfully\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/whatsapp/sendTemplate",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "whatsapp",
+                    "sendTemplate"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"content_type\": \"template\",\n  \"recipient\": \"{{recipientNumber}}\",\n  \"template\": { \"id\": \"tmpl-001\", \"components\": [] }\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "WhatsApp Send Message (Adapter)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"content_type\": \"text\",\n  \"recipient\": \"{{recipientNumber}}\",\n  \"text\": { \"body\": \"Hello from adapter\" }\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/whatsapp/sendMessage",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "whatsapp",
+                "sendMessage"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"messageId\": \"mock-adapter-msg-001\",\n  \"message\": \"Message sent successfully\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/whatsapp/sendMessage",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "whatsapp",
+                    "sendMessage"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"integrated_number\": \"{{integratedNumber}}\",\n  \"content_type\": \"text\",\n  \"recipient\": \"{{recipientNumber}}\",\n  \"text\": { \"body\": \"Hello from adapter\" }\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Phone Numbers (Adapter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/whatsapp/getPhoneNumbers",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "whatsapp",
+                "getPhoneNumbers"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"data\": [\n    { \"phone_number\": \"+919876500001\", \"display_name\": \"Nexora Technologies\" },\n    { \"phone_number\": \"+919876500002\", \"display_name\": \"Nexora Support\" }\n  ]\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/whatsapp/getPhoneNumbers",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "whatsapp",
+                    "getPhoneNumbers"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "MSG91 SMS",
+      "description": "SMS flow and OTP endpoints (MSG91 format)",
+      "item": [
+        {
+          "name": "Send SMS Flow",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"flow_id\": \"mock-flow-001\",\n  \"recipients\": [{ \"mobiles\": \"919876543201\", \"name\": \"Priya\" }]\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/flow/",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "flow",
+                ""
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"request_id\": \"mock-sms-flow-n1o2p3\",\n  \"message\": \"SMS sent successfully\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/flow/",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "flow",
+                    ""
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"flow_id\": \"mock-flow-001\",\n  \"recipients\": [{ \"mobiles\": \"919876543201\", \"name\": \"Priya\" }]\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"919876543201\",\n  \"template_id\": \"mock-otp-tmpl\"\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/otp/send",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "otp",
+                "send"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"request_id\": \"mock-otp-q4r5s6\",\n  \"message\": \"OTP sent successfully\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/otp/send",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "otp",
+                    "send"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"mobile\": \"919876543201\",\n  \"template_id\": \"mock-otp-tmpl\"\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authkey",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"919876543201\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/api/v5/otp/verify",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v5",
+                "otp",
+                "verify"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"type\": \"success\",\n  \"message\": \"OTP verified successfully\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/api/v5/otp/verify",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v5",
+                    "otp",
+                    "verify"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authkey",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"mobile\": \"919876543201\",\n  \"otp\": \"123456\"\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Fast2SMS",
+      "description": "Indian SMS via Fast2SMS (quick, DLT, OTP routes)",
+      "item": [
+        {
+          "name": "Send Quick SMS",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{mockBaseUrl}}/dev/bulkV2?authorization={{authKey}}&route=q&message=Hello+from+Nexora&language=english&flash=0&numbers=9876543201",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "dev",
+                "bulkV2"
+              ],
+              "query": [
+                {
+                  "key": "authorization",
+                  "value": "{{authKey}}"
+                },
+                {
+                  "key": "route",
+                  "value": "q"
+                },
+                {
+                  "key": "message",
+                  "value": "Hello+from+Nexora"
+                },
+                {
+                  "key": "language",
+                  "value": "english"
+                },
+                {
+                  "key": "flash",
+                  "value": "0"
+                },
+                {
+                  "key": "numbers",
+                  "value": "9876543201"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"return\": true,\n  \"request_id\": \"mock-f2s-t7u8v9\",\n  \"message\": [\"SMS sent successfully\"],\n  \"wallet\": 12500\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/dev/bulkV2?authorization={{authKey}}&route=q&message=Hello+from+Nexora&language=english&flash=0&numbers=9876543201",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "dev",
+                    "bulkV2"
+                  ],
+                  "query": [
+                    {
+                      "key": "authorization",
+                      "value": "{{authKey}}"
+                    },
+                    {
+                      "key": "route",
+                      "value": "q"
+                    },
+                    {
+                      "key": "message",
+                      "value": "Hello+from+Nexora"
+                    },
+                    {
+                      "key": "language",
+                      "value": "english"
+                    },
+                    {
+                      "key": "flash",
+                      "value": "0"
+                    },
+                    {
+                      "key": "numbers",
+                      "value": "9876543201"
+                    }
+                  ]
+                },
+                "header": []
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Wallet Balance",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "authorization",
+                "value": "{{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/dev/wallet",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "dev",
+                "wallet"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"return\": true,\n  \"wallet\": 12500,\n  \"message\": \"Balance fetched successfully\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/dev/wallet",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "dev",
+                    "wallet"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "{{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Delivery Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "authorization",
+                "value": "{{authKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/dev/delivery?request_id=mock-f2s-t7u8v9",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "dev",
+                "delivery"
+              ],
+              "query": [
+                {
+                  "key": "request_id",
+                  "value": "mock-f2s-t7u8v9"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"return\": true,\n  \"data\": [\n    {\n      \"number\": \"9876543201\",\n      \"status\": \"DELIVERED\",\n      \"delivered_at\": \"2026-02-21T10:30:45.000Z\"\n    }\n  ]\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/dev/delivery?request_id=mock-f2s-t7u8v9",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "dev",
+                    "delivery"
+                  ],
+                  "query": [
+                    {
+                      "key": "request_id",
+                      "value": "mock-f2s-t7u8v9"
+                    }
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "authorization",
+                    "value": "{{authKey}}"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "TeleCMI Voice",
+      "description": "Voice calling endpoints (TeleCMI format)",
+      "item": [
+        {
+          "name": "Initiate Call",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"+919876500001\",\n  \"to\": \"+919876543201\",\n  \"caller_id\": \"Nexora CRM\"\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/v2/calls",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "calls"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"call_id\": \"mock-call-z1a2b3c4\",\n  \"status\": \"initiated\",\n  \"from\": \"+919876500001\",\n  \"to\": \"+919876543201\",\n  \"created_at\": \"2026-02-21T10:00:00.000Z\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/v2/calls",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "v2",
+                    "calls"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"from\": \"+919876500001\",\n  \"to\": \"+919876543201\",\n  \"caller_id\": \"Nexora CRM\"\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Call Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/v2/calls/:callId",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "calls",
+                ":callId"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"call_id\": \"mock-call-z1a2b3c4\",\n  \"status\": \"completed\",\n  \"from\": \"+919876500001\",\n  \"to\": \"+919876543201\",\n  \"duration\": 245,\n  \"start_time\": \"2026-02-21T10:00:05.000Z\",\n  \"end_time\": \"2026-02-21T10:04:10.000Z\",\n  \"direction\": \"outbound\",\n  \"recording_url\": \"https://mock.pstmn.io/recordings/call-z1a2b3c4.mp3\",\n  \"transcript\": \"Customer interested in Pro plan. Discussed custom pricing for 25 users. Follow-up scheduled for Thursday.\",\n  \"ai_summary\": {\n    \"summary\": \"Customer Priya Sharma expressed interest in the Pro plan for her team of 25. Discussed volume pricing and enterprise features. Customer will make a decision by Thursday after internal review.\",\n    \"sentiment\": \"positive\",\n    \"action_items\": [\n      \"Send Pro plan pricing sheet for 25 users\",\n      \"Schedule follow-up call for Thursday 2PM\",\n      \"Prepare custom proposal with enterprise features\"\n    ],\n    \"topics\": [\"pricing\", \"enterprise features\", \"team onboarding\"]\n  }\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/v2/calls/:callId",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "v2",
+                    "calls",
+                    ":callId"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Call Recording",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/v2/calls/:callId/recording",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "v2",
+                "calls",
+                ":callId",
+                "recording"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"url\": \"https://mock.pstmn.io/recordings/call-z1a2b3c4.mp3\",\n  \"duration\": 245,\n  \"format\": \"mp3\",\n  \"size_bytes\": 2940000,\n  \"created_at\": \"2026-02-21T10:04:15.000Z\"\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/v2/calls/:callId/recording",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "v2",
+                    "calls",
+                    ":callId",
+                    "recording"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Resend Email",
+      "description": "Email sending and management (Resend API format)",
+      "item": [
+        {
+          "name": "Send Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"Nexora <noreply@nexoraos.pro>\",\n  \"to\": [\"priya.sharma@techcorp.in\"],\n  \"subject\": \"Your Nexora Pro Trial is Ready!\",\n  \"html\": \"<h1>Welcome to Nexora Pro!</h1><p>Your 14-day trial has started.</p>\"\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/emails",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "emails"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"mock-email-d4e5f6g7\",\n  \"status\": \"sent\",\n  \"from\": \"Nexora <noreply@nexoraos.pro>\",\n  \"to\": [\"priya.sharma@techcorp.in\"],\n  \"created_at\": \"2026-02-21T10:15:00.000Z\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/emails",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "emails"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"from\": \"Nexora <noreply@nexoraos.pro>\",\n  \"to\": [\"priya.sharma@techcorp.in\"],\n  \"subject\": \"Your Nexora Pro Trial is Ready!\",\n  \"html\": \"<h1>Welcome to Nexora Pro!</h1><p>Your 14-day trial has started.</p>\"\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Send Batch Emails",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"from\": \"Nexora <noreply@nexoraos.pro>\",\n    \"to\": \"priya@techcorp.in\",\n    \"subject\": \"Weekly Report\",\n    \"html\": \"<p>Your weekly CRM report is ready.</p>\"\n  },\n  {\n    \"from\": \"Nexora <noreply@nexoraos.pro>\",\n    \"to\": \"rajesh@startup.co\",\n    \"subject\": \"Weekly Report\",\n    \"html\": \"<p>Your weekly CRM report is ready.</p>\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/emails/batch",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "emails",
+                "batch"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"data\": [\n    { \"id\": \"mock-email-batch-001\" },\n    { \"id\": \"mock-email-batch-002\" }\n  ]\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/emails/batch",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "emails",
+                    "batch"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "[\n  {\n    \"from\": \"Nexora <noreply@nexoraos.pro>\",\n    \"to\": \"priya@techcorp.in\",\n    \"subject\": \"Weekly Report\",\n    \"html\": \"<p>Your weekly CRM report is ready.</p>\"\n  },\n  {\n    \"from\": \"Nexora <noreply@nexoraos.pro>\",\n    \"to\": \"rajesh@startup.co\",\n    \"subject\": \"Weekly Report\",\n    \"html\": \"<p>Your weekly CRM report is ready.</p>\"\n  }\n]"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Email Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/emails/:emailId",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "emails",
+                ":emailId"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": \"mock-email-d4e5f6g7\",\n  \"from\": \"Nexora <noreply@nexoraos.pro>\",\n  \"to\": [\"priya.sharma@techcorp.in\"],\n  \"subject\": \"Your Nexora Pro Trial is Ready!\",\n  \"last_event\": \"delivered\",\n  \"created_at\": \"2026-02-21T10:15:00.000Z\",\n  \"opens\": 2,\n  \"clicks\": 1,\n  \"events\": [\n    { \"type\": \"sent\", \"timestamp\": \"2026-02-21T10:15:01.000Z\" },\n    { \"type\": \"delivered\", \"timestamp\": \"2026-02-21T10:15:03.000Z\" },\n    { \"type\": \"opened\", \"timestamp\": \"2026-02-21T10:22:15.000Z\" },\n    { \"type\": \"clicked\", \"timestamp\": \"2026-02-21T10:22:45.000Z\" },\n    { \"type\": \"opened\", \"timestamp\": \"2026-02-21T14:05:30.000Z\" }\n  ]\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/emails/:emailId",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "emails",
+                    ":emailId"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "List Domains",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{mockBaseUrl}}/domains",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "domains"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"data\": [\n    {\n      \"id\": \"mock-domain-001\",\n      \"name\": \"nexoraos.pro\",\n      \"status\": \"verified\",\n      \"region\": \"ap-south-1\",\n      \"created_at\": \"2025-12-01T00:00:00.000Z\",\n      \"records\": [\n        { \"type\": \"MX\", \"name\": \"nexoraos.pro\", \"value\": \"feedback-smtp.mock.pstmn.io\", \"status\": \"verified\" },\n        { \"type\": \"TXT\", \"name\": \"nexoraos.pro\", \"value\": \"v=spf1 include:mock.pstmn.io ~all\", \"status\": \"verified\" },\n        { \"type\": \"CNAME\", \"name\": \"resend._domainkey.nexoraos.pro\", \"value\": \"mock-dkim.pstmn.io\", \"status\": \"verified\" }\n      ]\n    }\n  ]\n}",
+              "originalRequest": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/domains",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "domains"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  }
+                ]
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI Services",
+      "description": "AI-powered conversation analysis and suggestions",
+      "item": [
+        {
+          "name": "Summarize Conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversation_id\": \"conv-001\",\n  \"messages\": [\n    { \"role\": \"customer\", \"text\": \"Hi, I need help with my order\" },\n    { \"role\": \"agent\", \"text\": \"Sure! What's your order number?\" },\n    { \"role\": \"customer\", \"text\": \"ORD-2024-5678. It hasn't arrived yet.\" },\n    { \"role\": \"agent\", \"text\": \"Let me check. I see it's in transit, expected by tomorrow.\" },\n    { \"role\": \"customer\", \"text\": \"Thanks, that's helpful!\" }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/ai/summarize",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "summarize"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"summary\": {\n    \"bullets\": [\n      \"Customer inquired about delayed order ORD-2024-5678\",\n      \"Agent confirmed order is in transit, delivery expected tomorrow\",\n      \"Customer was satisfied with the update\"\n    ],\n    \"sentiment\": \"positive\",\n    \"resolution_status\": \"resolved\",\n    \"key_topics\": [\"order status\", \"delivery\", \"tracking\"],\n    \"customer_satisfaction\": 4.2,\n    \"urgency\": \"low\"\n  }\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/ai/summarize",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "summarize"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversation_id\": \"conv-001\",\n  \"messages\": [\n    { \"role\": \"customer\", \"text\": \"Hi, I need help with my order\" },\n    { \"role\": \"agent\", \"text\": \"Sure! What's your order number?\" },\n    { \"role\": \"customer\", \"text\": \"ORD-2024-5678. It hasn't arrived yet.\" },\n    { \"role\": \"agent\", \"text\": \"Let me check. I see it's in transit, expected by tomorrow.\" },\n    { \"role\": \"customer\", \"text\": \"Thanks, that's helpful!\" }\n  ]\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Suggest Reply",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversation_id\": \"conv-002\",\n  \"last_message\": \"What plans do you offer for a team of 15 people?\",\n  \"context\": \"sales_inquiry\"\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/ai/suggest-reply",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "suggest-reply"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"suggestions\": [\n    {\n      \"text\": \"Great question! For a team of 15, our Pro plan at ₹999/user/month would be perfect. It includes unlimited contacts, WhatsApp integration, and advanced analytics. Shall I share the detailed pricing?\",\n      \"tone\": \"professional\",\n      \"confidence\": 0.92\n    },\n    {\n      \"text\": \"Hi! We have a Business plan starting at ₹799/user/month and a Pro plan at ₹999/user/month. For 15 users, I'd recommend Pro — it includes everything your team needs. Want me to set up a demo?\",\n      \"tone\": \"friendly\",\n      \"confidence\": 0.88\n    },\n    {\n      \"text\": \"We offer competitive team pricing! For 15 users on our Pro plan, we can offer a 10% volume discount bringing it to ₹899/user/month. This includes full CRM, marketing automation, and priority support.\",\n      \"tone\": \"sales\",\n      \"confidence\": 0.85\n    }\n  ]\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/ai/suggest-reply",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "suggest-reply"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"conversation_id\": \"conv-002\",\n  \"last_message\": \"What plans do you offer for a team of 15 people?\",\n  \"context\": \"sales_inquiry\"\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Analyze Sentiment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"I've been trying to reach support for 3 days now. The product is good but this service is frustrating.\",\n  \"context\": \"support_ticket\"\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/ai/sentiment",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "sentiment"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"sentiment\": \"negative\",\n  \"score\": -0.45,\n  \"confidence\": 0.89,\n  \"emotions\": {\n    \"frustration\": 0.78,\n    \"satisfaction\": 0.22,\n    \"urgency\": 0.65\n  },\n  \"keywords\": [\"support\", \"frustrating\", \"3 days\", \"trying to reach\"],\n  \"recommendation\": \"Prioritize this customer — they appreciate the product but are frustrated with response time. A quick, empathetic response can recover this relationship.\"\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/ai/sentiment",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "sentiment"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"text\": \"I've been trying to reach support for 3 days now. The product is good but this service is frustrating.\",\n  \"context\": \"support_ticket\"\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Classify Intent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authKey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"I'd like to know the pricing for the enterprise plan and if you offer GST invoicing\",\n  \"context\": \"inbound_message\"\n}"
+            },
+            "url": {
+              "raw": "{{mockBaseUrl}}/ai/classify-intent",
+              "host": [
+                "{{mockBaseUrl}}"
+              ],
+              "path": [
+                "ai",
+                "classify-intent"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Success",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"intent\": \"purchase_inquiry\",\n  \"confidence\": 0.91,\n  \"category\": \"SALES\",\n  \"sub_intents\": [\n    { \"intent\": \"pricing_request\", \"confidence\": 0.94 },\n    { \"intent\": \"feature_inquiry\", \"confidence\": 0.87 }\n  ],\n  \"entities\": [\n    { \"type\": \"plan\", \"value\": \"enterprise\", \"confidence\": 0.96 },\n    { \"type\": \"feature\", \"value\": \"GST invoicing\", \"confidence\": 0.93 }\n  ],\n  \"suggested_actions\": [\n    { \"action\": \"route_to_sales\", \"priority\": \"high\" },\n    { \"action\": \"send_pricing_sheet\", \"priority\": \"medium\" }\n  ]\n}",
+              "originalRequest": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{mockBaseUrl}}/ai/classify-intent",
+                  "host": [
+                    "{{mockBaseUrl}}"
+                  ],
+                  "path": [
+                    "ai",
+                    "classify-intent"
+                  ]
+                },
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{authKey}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"text\": \"I'd like to know the pricing for the enterprise plan and if you offer GST invoicing\",\n  \"context\": \"inbound_message\"\n}"
+                }
+              },
+              "_postmanPreviewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

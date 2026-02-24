@@ -149,25 +149,25 @@
  * @see https://developers.facebook.com/docs/whatsapp/cloud-api/reference/voice
  */
 
-import { prisma } from '@crm360/database'
-import { logger } from '../../logger.js'
+import { prisma } from '@crm360/database';
+import { logger } from '../../logger.js';
 
-const MSG91_CONTROL_URL = 'https://control.msg91.com/api/v5'
+const MSG91_CONTROL_URL = 'https://control.msg91.com/api/v5';
 
 // Feature flag - Set to true to enable voice calling
-const VOICE_CALLING_ENABLED = false
+const VOICE_CALLING_ENABLED = false;
 
 class WhatsAppVoiceService {
   constructor() {
-    this.logger = logger.child({ service: 'WhatsAppVoiceService' })
-    this.enabled = VOICE_CALLING_ENABLED
+    this.logger = logger.child({ service: 'WhatsAppVoiceService' });
+    this.enabled = VOICE_CALLING_ENABLED;
   }
 
   /**
    * Check if voice calling feature is enabled
    */
   isEnabled() {
-    return this.enabled
+    return this.enabled;
   }
 
   /**
@@ -175,10 +175,10 @@ class WhatsAppVoiceService {
    */
   getHeaders(authKey) {
     return {
-      'authkey': authKey,
+      authkey: authKey,
       'Content-Type': 'application/json',
-      'accept': 'application/json',
-    }
+      accept: 'application/json',
+    };
   }
 
   /**
@@ -193,32 +193,35 @@ class WhatsAppVoiceService {
       return {
         success: false,
         error: 'Voice calling feature is currently disabled',
-        reason: 'FEATURE_DISABLED'
-      }
+        reason: 'FEATURE_DISABLED',
+      };
     }
 
     try {
-      const response = await fetch(`${MSG91_CONTROL_URL}/whatsapp/integrated-number/call-settings/`, {
-        method: 'POST',
-        headers: this.getHeaders(authKey),
-        body: JSON.stringify({
-          integrated_number: integratedNumber,
-          voice_enabled: true,
-        }),
-      })
+      const response = await fetch(
+        `${MSG91_CONTROL_URL}/whatsapp/integrated-number/call-settings/`,
+        {
+          method: 'POST',
+          headers: this.getHeaders(authKey),
+          body: JSON.stringify({
+            integrated_number: integratedNumber,
+            voice_enabled: true,
+          }),
+        }
+      );
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        this.logger.error({ response: data }, 'Failed to enable voice calling')
-        return { success: false, error: data.message || 'Failed to enable voice calling' }
+        this.logger.error({ response: data }, 'Failed to enable voice calling');
+        return { success: false, error: data.message || 'Failed to enable voice calling' };
       }
 
-      this.logger.info({ integratedNumber }, 'Voice calling enabled')
-      return { success: true, data }
+      this.logger.info({ integratedNumber }, 'Voice calling enabled');
+      return { success: true, data };
     } catch (error) {
-      this.logger.error({ error }, 'Error enabling voice calling')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Error enabling voice calling');
+      return { success: false, error: error.message };
     }
   }
 
@@ -234,32 +237,35 @@ class WhatsAppVoiceService {
       return {
         success: false,
         error: 'Voice calling feature is currently disabled',
-        reason: 'FEATURE_DISABLED'
-      }
+        reason: 'FEATURE_DISABLED',
+      };
     }
 
     try {
-      const response = await fetch(`${MSG91_CONTROL_URL}/whatsapp/integrated-number/call-settings/`, {
-        method: 'POST',
-        headers: this.getHeaders(authKey),
-        body: JSON.stringify({
-          integrated_number: integratedNumber,
-          voice_enabled: false,
-        }),
-      })
+      const response = await fetch(
+        `${MSG91_CONTROL_URL}/whatsapp/integrated-number/call-settings/`,
+        {
+          method: 'POST',
+          headers: this.getHeaders(authKey),
+          body: JSON.stringify({
+            integrated_number: integratedNumber,
+            voice_enabled: false,
+          }),
+        }
+      );
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        this.logger.error({ response: data }, 'Failed to disable voice calling')
-        return { success: false, error: data.message || 'Failed to disable voice calling' }
+        this.logger.error({ response: data }, 'Failed to disable voice calling');
+        return { success: false, error: data.message || 'Failed to disable voice calling' };
       }
 
-      this.logger.info({ integratedNumber }, 'Voice calling disabled')
-      return { success: true, data }
+      this.logger.info({ integratedNumber }, 'Voice calling disabled');
+      return { success: true, data };
     } catch (error) {
-      this.logger.error({ error }, 'Error disabling voice calling')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Error disabling voice calling');
+      return { success: false, error: error.message };
     }
   }
 
@@ -275,34 +281,34 @@ class WhatsAppVoiceService {
       return {
         success: false,
         error: 'Voice calling feature is currently disabled',
-        reason: 'FEATURE_DISABLED'
-      }
+        reason: 'FEATURE_DISABLED',
+      };
     }
 
     try {
-      const url = new URL(`${MSG91_CONTROL_URL}/whatsapp/integrated-number/call-settings/`)
-      url.searchParams.set('integrated_number', integratedNumber)
+      const url = new URL(`${MSG91_CONTROL_URL}/whatsapp/integrated-number/call-settings/`);
+      url.searchParams.set('integrated_number', integratedNumber);
 
       const response = await fetch(url.toString(), {
         method: 'GET',
         headers: this.getHeaders(authKey),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        this.logger.error({ response: data }, 'Failed to get voice settings')
-        return { success: false, error: data.message || 'Failed to get voice settings' }
+        this.logger.error({ response: data }, 'Failed to get voice settings');
+        return { success: false, error: data.message || 'Failed to get voice settings' };
       }
 
       return {
         success: true,
         voiceEnabled: data.voice_enabled || false,
-        data
-      }
+        data,
+      };
     } catch (error) {
-      this.logger.error({ error }, 'Error getting voice settings')
-      return { success: false, error: error.message }
+      this.logger.error({ error }, 'Error getting voice settings');
+      return { success: false, error: error.message };
     }
   }
 
@@ -314,39 +320,44 @@ class WhatsAppVoiceService {
    */
   async processVoiceWebhook(channelAccountId, payload) {
     if (!this.enabled) {
-      this.logger.warn({ payload }, 'Received voice webhook but feature is disabled')
-      return { success: false, reason: 'FEATURE_DISABLED' }
+      this.logger.warn({ payload }, 'Received voice webhook but feature is disabled');
+      return { success: false, reason: 'FEATURE_DISABLED' };
     }
 
-    const { type, event, call_id, from, to, duration, end_reason, timestamp } = payload
+    const { type, event, call_id, from, to, duration, end_reason, timestamp } = payload;
 
     if (type !== 'voice') {
-      return { success: false, error: 'Not a voice event' }
+      return { success: false, error: 'Not a voice event' };
     }
 
     try {
       switch (event) {
         case 'call_initiated':
-          await this.handleCallInitiated(channelAccountId, { call_id, from, to, timestamp })
-          break
+          await this.handleCallInitiated(channelAccountId, { call_id, from, to, timestamp });
+          break;
 
         case 'call_connected':
-          await this.handleCallConnected(channelAccountId, { call_id, timestamp })
-          break
+          await this.handleCallConnected(channelAccountId, { call_id, timestamp });
+          break;
 
         case 'call_ended':
-          await this.handleCallEnded(channelAccountId, { call_id, duration, end_reason, timestamp })
-          break
+          await this.handleCallEnded(channelAccountId, {
+            call_id,
+            duration,
+            end_reason,
+            timestamp,
+          });
+          break;
 
         default:
-          this.logger.warn({ event, payload }, 'Unknown voice call event')
-          return { success: false, error: `Unknown event: ${event}` }
+          this.logger.warn({ event, payload }, 'Unknown voice call event');
+          return { success: false, error: `Unknown event: ${event}` };
       }
 
-      return { success: true }
+      return { success: true };
     } catch (error) {
-      this.logger.error({ error, payload }, 'Error processing voice webhook')
-      return { success: false, error: error.message }
+      this.logger.error({ error, payload }, 'Error processing voice webhook');
+      return { success: false, error: error.message };
     }
   }
 
@@ -355,7 +366,7 @@ class WhatsAppVoiceService {
    * @private
    */
   async handleCallInitiated(channelAccountId, { call_id, from, to, timestamp }) {
-    this.logger.info({ channelAccountId, call_id, from, to }, 'Voice call initiated')
+    this.logger.info({ channelAccountId, call_id, from, to }, 'Voice call initiated');
 
     // TODO: When enabling, implement:
     // 1. Create VoiceCall record
@@ -369,7 +380,7 @@ class WhatsAppVoiceService {
    * @private
    */
   async handleCallConnected(channelAccountId, { call_id, timestamp }) {
-    this.logger.info({ channelAccountId, call_id }, 'Voice call connected')
+    this.logger.info({ channelAccountId, call_id }, 'Voice call connected');
 
     // TODO: When enabling, implement:
     // 1. Update VoiceCall record status to 'connected'
@@ -382,7 +393,7 @@ class WhatsAppVoiceService {
    * @private
    */
   async handleCallEnded(channelAccountId, { call_id, duration, end_reason, timestamp }) {
-    this.logger.info({ channelAccountId, call_id, duration, end_reason }, 'Voice call ended')
+    this.logger.info({ channelAccountId, call_id, duration, end_reason }, 'Voice call ended');
 
     // TODO: When enabling, implement:
     // 1. Update VoiceCall record status to 'ended'
@@ -400,14 +411,14 @@ class WhatsAppVoiceService {
    */
   async getCallHistory(conversationId) {
     if (!this.enabled) {
-      return { success: true, calls: [], message: 'Voice calling is not enabled' }
+      return { success: true, calls: [], message: 'Voice calling is not enabled' };
     }
 
     // TODO: When enabling, implement:
     // 1. Query VoiceCall records for this conversation
     // 2. Return call history with duration, status, timestamps
 
-    return { success: true, calls: [] }
+    return { success: true, calls: [] };
   }
 
   /**
@@ -446,12 +457,12 @@ class WhatsAppVoiceService {
       },
       webhookEvents: ['call_initiated', 'call_connected', 'call_ended'],
       documentation: 'https://docs.msg91.com/whatsapp/voice-calling',
-    }
+    };
   }
 }
 
 // Export singleton instance
-export const whatsAppVoiceService = new WhatsAppVoiceService()
+export const whatsAppVoiceService = new WhatsAppVoiceService();
 
 // Export class for testing
-export { WhatsAppVoiceService }
+export { WhatsAppVoiceService };

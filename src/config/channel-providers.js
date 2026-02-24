@@ -113,6 +113,19 @@ export const EMAIL_PROVIDERS = {
     requiredFields: ['email', 'password', 'smtpHost', 'smtpPort', 'imapHost', 'imapPort'],
     testable: true,
   },
+
+  // API Dog — Third-party service partner (all channels via single API)
+  APIDOG: {
+    id: 'apidog',
+    name: 'API Dog',
+    type: 'api',
+    icon: 'apidog',
+    color: '#FA5A28',
+    requiredFields: ['baseUrl', 'apiToken'],
+    features: ['mock_send', 'mock_receive', 'mock_tracking'],
+    documentation: 'https://docs.apidog.com/mock-api-data-in-apidog-617869m0',
+    testable: true,
+  },
 };
 
 /**
@@ -191,6 +204,18 @@ export const WHATSAPP_PROVIDERS = {
     requiredFields: ['accountSid', 'authToken', 'phoneNumber'],
     features: ['text', 'media', 'template'],
     documentation: 'https://www.twilio.com/docs/whatsapp',
+    testable: true,
+  },
+  APIDOG: {
+    id: 'apidog',
+    name: 'API Dog',
+    icon: 'apidog',
+    color: '#FA5A28',
+    baseUrl: '', // Dynamic — set via providerConfig.baseUrl
+    webhookSupport: false,
+    requiredFields: ['baseUrl', 'apiToken'],
+    features: ['text', 'media', 'template', 'interactive'],
+    documentation: 'https://docs.apidog.com/mock-api-data-in-apidog-617869m0',
     testable: true,
   },
 };
@@ -285,6 +310,18 @@ export const SMS_PROVIDERS = {
     documentation: 'https://www.twilio.com/docs/sms',
     testable: true,
   },
+  APIDOG: {
+    id: 'apidog',
+    name: 'API Dog',
+    icon: 'apidog',
+    color: '#FA5A28',
+    baseUrl: '', // Dynamic — set via providerConfig.baseUrl
+    country: 'ALL',
+    requiredFields: ['baseUrl', 'apiToken'],
+    features: ['transactional', 'otp', 'bulk'],
+    documentation: 'https://docs.apidog.com/mock-api-data-in-apidog-617869m0',
+    testable: true,
+  },
 };
 
 /**
@@ -353,6 +390,18 @@ export const VOICE_PROVIDERS = {
     requiredFields: ['accountSid', 'authToken', 'phoneNumber'],
     features: ['outbound', 'inbound', 'ivr', 'recording', 'conferencing', 'transcription'],
     documentation: 'https://www.twilio.com/docs/voice',
+    testable: true,
+  },
+  APIDOG: {
+    id: 'apidog',
+    name: 'API Dog',
+    icon: 'apidog',
+    color: '#FA5A28',
+    baseUrl: '', // Dynamic — set via providerConfig.baseUrl
+    country: 'ALL',
+    requiredFields: ['baseUrl', 'apiToken'],
+    features: ['outbound', 'inbound', 'recording', 'ai_summary'],
+    documentation: 'https://docs.apidog.com/mock-api-data-in-apidog-617869m0',
     testable: true,
   },
 };

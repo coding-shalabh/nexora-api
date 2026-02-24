@@ -250,6 +250,11 @@ export const segmentsService = {
    * Create a new segment
    */
   async create({ tenantId, userId, data }) {
+    // Check if Segment model exists in prisma client
+    if (!prisma.segment) {
+      throw new Error('Segments feature is not yet available');
+    }
+
     // Check for duplicate name
     const existing = await prisma.segment.findFirst({
       where: { tenantId, name: data.name },

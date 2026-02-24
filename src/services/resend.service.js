@@ -10,6 +10,27 @@ const RESEND_API_URL = 'https://api.resend.com';
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 /**
+ * Resolve email API URL — API Dog provider routes via account's configured base URL
+ * @param {object} providerConfig - { baseUrl, apiToken } from ChannelAccount.providerConfig
+ */
+function resolveEmailUrl(providerConfig) {
+  if (providerConfig?.baseUrl) return providerConfig.baseUrl;
+  return RESEND_API_URL;
+}
+
+/**
+ * Build headers with provider-aware auth
+ */
+function getResendHeaders(withBody = false, providerConfig = null) {
+  const headers = {
+    Authorization: `Bearer ${RESEND_API_KEY}`,
+    ...(withBody ? { 'Content-Type': 'application/json' } : {}),
+  };
+  if (providerConfig?.apiToken) headers.apidogToken = providerConfig.apiToken;
+  return headers;
+}
+
+/**
  * Send a single email via Resend
  */
 export async function sendEmail({
@@ -23,6 +44,7 @@ export async function sendEmail({
   bcc,
   attachments,
   tags,
+  providerConfig,
 }) {
   try {
     if (!RESEND_API_KEY) {
@@ -53,12 +75,10 @@ export async function sendEmail({
       }));
     }
 
-    const response = await fetch(`${RESEND_API_URL}/emails`, {
+    const baseUrl = resolveEmailUrl(providerConfig);
+    const response = await fetch(`${baseUrl}/emails`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getResendHeaders(true, providerConfig),
       body: JSON.stringify(payload),
     });
 
@@ -93,7 +113,7 @@ export async function sendEmail({
 /**
  * Send batch emails (up to 100 at once)
  */
-export async function sendBatchEmails(emails) {
+export async function sendBatchEmails(emails, providerConfig = null) {
   try {
     if (!RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY not configured');
@@ -103,12 +123,10 @@ export async function sendBatchEmails(emails) {
       throw new Error('Batch limit is 100 emails');
     }
 
-    const response = await fetch(`${RESEND_API_URL}/emails/batch`, {
+    const baseUrl = resolveEmailUrl(providerConfig);
+    const response = await fetch(`${baseUrl}/emails/batch`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getResendHeaders(true, providerConfig),
       body: JSON.stringify(emails),
     });
 
@@ -141,17 +159,16 @@ export async function sendBatchEmails(emails) {
 /**
  * Get email status by ID
  */
-export async function getEmailStatus(emailId) {
+export async function getEmailStatus(emailId, providerConfig = null) {
   try {
     if (!RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY not configured');
     }
 
-    const response = await fetch(`${RESEND_API_URL}/emails/${emailId}`, {
+    const baseUrl = resolveEmailUrl(providerConfig);
+    const response = await fetch(`${baseUrl}/emails/${emailId}`, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
+      headers: getResendHeaders(false, providerConfig),
     });
 
     const data = await response.json();
@@ -186,17 +203,16 @@ export async function getEmailStatus(emailId) {
 /**
  * List domains
  */
-export async function listDomains() {
+export async function listDomains(providerConfig = null) {
   try {
     if (!RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY not configured');
     }
 
-    const response = await fetch(`${RESEND_API_URL}/domains`, {
+    const baseUrl = resolveEmailUrl(providerConfig);
+    const response = await fetch(`${baseUrl}/domains`, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
+      headers: getResendHeaders(false, providerConfig),
     });
 
     const data = await response.json();
@@ -224,18 +240,16 @@ export async function listDomains() {
 /**
  * Add a domain for sending
  */
-export async function addDomain(domain, region = 'us-east-1') {
+export async function addDomain(domain, region = 'us-east-1', providerConfig = null) {
   try {
     if (!RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY not configured');
     }
 
-    const response = await fetch(`${RESEND_API_URL}/domains`, {
+    const baseUrl = resolveEmailUrl(providerConfig);
+    const response = await fetch(`${baseUrl}/domains`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: getResendHeaders(true, providerConfig),
       body: JSON.stringify({ name: domain, region }),
     });
 
@@ -265,17 +279,16 @@ export async function addDomain(domain, region = 'us-east-1') {
 /**
  * Verify domain DNS
  */
-export async function verifyDomain(domainId) {
+export async function verifyDomain(domainId, providerConfig = null) {
   try {
     if (!RESEND_API_KEY) {
       throw new Error('RESEND_API_KEY not configured');
     }
 
-    const response = await fetch(`${RESEND_API_URL}/domains/${domainId}/verify`, {
+    const baseUrl = resolveEmailUrl(providerConfig);
+    const response = await fetch(`${baseUrl}/domains/${domainId}/verify`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
+      headers: getResendHeaders(false, providerConfig),
     });
 
     const data = await response.json();
@@ -304,7 +317,7 @@ export async function verifyDomain(domainId) {
 /**
  * Get API key info / test connection
  */
-export async function testConnection() {
+export async function testConnection(providerConfig = null) {
   try {
     if (!RESEND_API_KEY) {
       return {
@@ -313,11 +326,10 @@ export async function testConnection() {
       };
     }
 
-    const response = await fetch(`${RESEND_API_URL}/domains`, {
+    const baseUrl = resolveEmailUrl(providerConfig);
+    const response = await fetch(`${baseUrl}/domains`, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-      },
+      headers: getResendHeaders(false, providerConfig),
     });
 
     if (!response.ok) {

@@ -21,6 +21,24 @@ export class WhatsAppAdapter extends BaseChannelAdapter {
     this.apiKey = channelAccount.credentials?.apiKey;
     this.phoneNumber = channelAccount.identifier;
     this.wabaId = channelAccount.credentials?.wabaId;
+    // Resolve base URL from provider config
+    this.baseUrl = this._resolveBaseUrl(channelAccount);
+  }
+
+  _resolveBaseUrl(channelAccount) {
+    // API Dog provider — route via account's configured base URL
+    if (channelAccount.provider === 'APIDOG' && channelAccount.providerConfig?.baseUrl) {
+      this._providerToken = channelAccount.providerConfig.apiToken || '';
+      return channelAccount.providerConfig.baseUrl + '/api/v5/whatsapp';
+    }
+    this._providerToken = '';
+    return WHATSAPP_API_BASE;
+  }
+
+  _getHeaders(extra = {}) {
+    const headers = { authkey: this.apiKey, ...extra };
+    if (this._providerToken) headers.apidogToken = this._providerToken;
+    return headers;
   }
 
   getChannelType() {
@@ -75,7 +93,7 @@ export class WhatsAppAdapter extends BaseChannelAdapter {
     try {
       const payload = this.buildMessagePayload(message);
 
-      const response = await fetch(`${WHATSAPP_API_BASE}/sendMessage`, {
+      const response = await fetch(`${this.baseUrl}/sendMessage`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,7 +190,7 @@ export class WhatsAppAdapter extends BaseChannelAdapter {
         },
       };
 
-      const response = await fetch(`${WHATSAPP_API_BASE}/sendTemplate`, {
+      const response = await fetch(`${this.baseUrl}/sendTemplate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -287,7 +305,7 @@ export class WhatsAppAdapter extends BaseChannelAdapter {
 
   async validateCredentials() {
     try {
-      const response = await fetch(`${WHATSAPP_API_BASE}/getPhoneNumbers`, {
+      const response = await fetch(`${this.baseUrl}/getPhoneNumbers`, {
         headers: {
           authkey: this.apiKey,
         },
@@ -337,7 +355,7 @@ export class WhatsAppAdapter extends BaseChannelAdapter {
     formData.append('file', new Blob([buffer], { type: mimeType }));
     formData.append('type', mimeType);
 
-    const response = await fetch(`${WHATSAPP_API_BASE}/media/upload`, {
+    const response = await fetch(`${this.baseUrl}/media/upload`, {
       method: 'POST',
       headers: {
         authkey: this.apiKey,
@@ -355,7 +373,7 @@ export class WhatsAppAdapter extends BaseChannelAdapter {
   }
 
   async downloadMedia(mediaId) {
-    const response = await fetch(`${WHATSAPP_API_BASE}/media/${mediaId}`, {
+    const response = await fetch(`${this.baseUrl}/media/${mediaId}`, {
       headers: {
         authkey: this.apiKey,
       },

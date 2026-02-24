@@ -12,8 +12,8 @@ const configSchema = z.object({
 
   // Auth
   jwtSecret: z.string().min(32),
-  jwtAccessExpiry: z.string().default('1y'), // 1 year for testing/crawling
-  jwtRefreshExpiry: z.string().default('1y'), // 1 year for testing/crawling
+  jwtAccessExpiry: z.string().default('15m'),
+  jwtRefreshExpiry: z.string().default('7d'),
 
   // System Email (SMTP)
   smtpHost: z.string().optional(),

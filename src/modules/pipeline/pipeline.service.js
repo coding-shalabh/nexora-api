@@ -135,17 +135,60 @@ const generateMockDeals = (stages) => {
 };
 
 class PipelineService {
+  async getOrCreateDefaultDealPipeline(tenantId) {
+    let pipeline = await prisma.pipeline.findFirst({
+      where: { tenantId, type: 'DEAL' },
+      include: { stages: { orderBy: { order: 'asc' } } },
+    });
+
+    if (!pipeline) {
+      pipeline = await prisma.pipeline.create({
+        data: {
+          tenantId,
+          name: 'Sales Pipeline',
+          type: 'DEAL',
+          stages: {
+            create: [
+              { tenantId, name: 'Qualification', order: 1, color: '#3B82F6', probability: 10 },
+              { tenantId, name: 'Discovery', order: 2, color: '#8B5CF6', probability: 25 },
+              { tenantId, name: 'Proposal', order: 3, color: '#F59E0B', probability: 50 },
+              { tenantId, name: 'Negotiation', order: 4, color: '#EF4444', probability: 75 },
+              {
+                tenantId,
+                name: 'Closed Won',
+                order: 5,
+                color: '#22C55E',
+                probability: 100,
+                isWon: true,
+                isClosed: true,
+              },
+            ],
+          },
+        },
+        include: { stages: { orderBy: { order: 'asc' } } },
+      });
+    }
+
+    return pipeline;
+  }
+
   async getPipelines(tenantId, type) {
     const where = { tenantId };
     if (type) where.type = type;
 
-    const pipelines = await prisma.pipeline.findMany({
+    let pipelines = await prisma.pipeline.findMany({
       where,
       include: {
         stages: { orderBy: { order: 'asc' } },
       },
       orderBy: { createdAt: 'asc' },
     });
+
+    // Auto-create default DEAL pipeline if none exists
+    if (type === 'DEAL' && pipelines.length === 0) {
+      const defaultPipeline = await this.getOrCreateDefaultDealPipeline(tenantId);
+      pipelines = [defaultPipeline];
+    }
 
     return pipelines;
   }

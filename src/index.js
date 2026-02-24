@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import { initSentry } from './config/sentry.js';
+initSentry(); // Must be first
 import http from 'http';
 import { createServer } from './server.js';
 import { logger } from './common/logger.js';
@@ -6,9 +8,20 @@ import { config } from './config/index.js';
 import { initializeSocketIO } from './common/websocket/socket.service.js';
 import { initializeWorkers, shutdownWorkers } from './workers/index.js';
 import { prisma } from '@crm360/database';
+import { loadSecretsFromAWS, isAWSConfigured } from './config/aws.js';
 
 async function bootstrap() {
   try {
+    // 0. Load secrets from AWS Secrets Manager (if configured)
+    // This replaces .env in production
+    if (isAWSConfigured()) {
+      logger.info('AWS configured, loading secrets from Secrets Manager...');
+      await loadSecretsFromAWS();
+      logger.info('AWS Secrets loaded (or using local .env as fallback)');
+    } else {
+      logger.info('AWS not configured, using local .env file');
+    }
+
     // 1. First, connect to database and warm up connection pool
     logger.info('Connecting to database...');
     await prisma.$connect();
@@ -70,5 +83,16 @@ async function bootstrap() {
     process.exit(1);
   }
 }
+
+// Global error handlers — catch crashes that bypass Express error handler
+process.on('uncaughtException', (error) => {
+  logger.fatal(error, 'Uncaught exception — process will exit');
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.fatal({ reason }, 'Unhandled promise rejection — process will exit');
+  process.exit(1);
+});
 
 bootstrap();

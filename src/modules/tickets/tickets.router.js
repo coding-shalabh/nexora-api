@@ -143,6 +143,19 @@ router.patch('/:id/resolve', requirePermission('tickets:update'), async (req, re
   }
 });
 
+router.delete('/:id', requirePermission('tickets:delete'), async (req, res, next) => {
+  try {
+    await ticketsService.deleteTicket(req.tenantId, req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Ticket deleted',
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/:id/comments', requirePermission('tickets:update'), async (req, res, next) => {
   try {
     const { content, isInternal } = z

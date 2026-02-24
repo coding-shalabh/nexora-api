@@ -113,21 +113,13 @@ router.post('/conversations', async (req, res, next) => {
       .object({
         channelType: z.enum(['WHATSAPP', 'SMS', 'EMAIL', 'VOICE']),
         channelAccountId: z.string().optional(),
-        contactId: z.string(),
+        contactId: z.string().optional(),
+        contactPhone: z.string().optional(),
         initialMessage: z.string().optional(),
       })
       .parse(req.body);
 
-    // TODO: Implement conversation creation in service
-    // For now, return mock conversation
-    const conversation = {
-      id: 'conv_' + Date.now(),
-      channelType: data.channelType,
-      contactId: data.contactId,
-      status: 'OPEN',
-      createdAt: new Date().toISOString(),
-      tenantId: req.tenantId,
-    };
+    const conversation = await inboxService.createConversation(req.tenantId, data);
 
     res.status(201).json({
       success: true,
@@ -146,20 +138,14 @@ router.patch('/conversations/:id', async (req, res, next) => {
   try {
     const data = z
       .object({
-        status: z.enum(['OPEN', 'PENDING', 'RESOLVED', 'CLOSED', 'SNOOZED']).optional(),
+        status: z.enum(['OPEN', 'PENDING', 'RESOLVED', 'CLOSED']).optional(),
         priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
         purpose: z.enum(['GENERAL', 'SALES', 'SUPPORT', 'SERVICE', 'MARKETING']).optional(),
         assignedTo: z.string().optional(),
       })
       .parse(req.body);
 
-    // TODO: Implement conversation update in service
-    // For now, return mock updated conversation
-    const conversation = {
-      id: req.params.id,
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
+    const conversation = await inboxService.updateConversation(req.tenantId, req.params.id, data);
 
     res.json({
       success: true,
@@ -282,16 +268,52 @@ router.get('/activity', async (req, res, next) => {
       })
       .parse(req.query);
 
-    // For now, return empty array - will implement service method later
+    const tenantId = req.tenantId;
+    const { page, limit, period, type } = params;
+
+    // Build date filter
+    const dateFilter = {};
+    const now = new Date();
+    if (period === 'today') {
+      dateFilter.gte = new Date(now.setHours(0, 0, 0, 0));
+    } else if (period === 'week') {
+      dateFilter.gte = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (period === 'month') {
+      dateFilter.gte = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    // Map activity types to message_events direction filter
+    const where = { tenantId };
+    if (Object.keys(dateFilter).length > 0) where.createdAt = dateFilter;
+    if (type === 'MESSAGE_SENT') where.direction = 'OUTBOUND';
+    else if (type === 'MESSAGE_RECEIVED') where.direction = 'INBOUND';
+
+    const [events, total] = await Promise.all([
+      prisma.message_events.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: { thread: { select: { id: true, contactName: true, contactPhone: true } } },
+      }),
+      prisma.message_events.count({ where }),
+    ]);
+
+    const activities = events.map((e) => ({
+      id: e.id,
+      type: e.direction === 'OUTBOUND' ? 'MESSAGE_SENT' : 'MESSAGE_RECEIVED',
+      conversationId: e.threadId,
+      contactName: e.thread?.contactName || e.thread?.contactPhone || 'Unknown',
+      channel: e.channel,
+      content:
+        e.contentType === 'TEXT' ? (e.textBody || '').substring(0, 100) : `[${e.contentType}]`,
+      createdAt: e.createdAt,
+    }));
+
     res.json({
       success: true,
-      data: [],
-      meta: {
-        page: params.page,
-        limit: params.limit,
-        total: 0,
-        totalPages: 0,
-      },
+      data: activities,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (error) {
     next(error);
@@ -349,7 +371,11 @@ router.post('/conversations/:id/messages', async (req, res, next) => {
     const data = z
       .object({
         content: z.string().min(1),
-        type: z.enum(['TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT', 'TEMPLATE']).default('TEXT'),
+        type: z
+          .string()
+          .transform((v) => v.toUpperCase())
+          .pipe(z.enum(['TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT', 'TEMPLATE']))
+          .default('TEXT'),
       })
       .parse(req.body);
 
@@ -561,6 +587,51 @@ router.patch('/conversations/:id/archive', async (req, res, next) => {
 router.patch('/conversations/:id/unarchive', async (req, res, next) => {
   try {
     const conversation = await inboxService.unarchiveConversation(req.tenantId, req.params.id);
+
+    res.json({
+      success: true,
+      data: conversation,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Snooze conversation
+ */
+router.post('/conversations/:id/snooze', async (req, res, next) => {
+  try {
+    const data = z
+      .object({
+        duration: z.enum(['LATER_TODAY', 'TOMORROW', 'NEXT_WEEK']).optional(),
+        customUntil: z.string().optional(),
+        reason: z.string().optional(),
+      })
+      .parse(req.body);
+
+    const conversation = await inboxService.snoozeConversation(req.tenantId, req.params.id, {
+      duration: data.duration,
+      customUntil: data.customUntil,
+      reason: data.reason,
+      userId: req.userId,
+    });
+
+    res.json({
+      success: true,
+      data: conversation,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Unsnooze conversation
+ */
+router.post('/conversations/:id/unsnooze', async (req, res, next) => {
+  try {
+    const conversation = await inboxService.unsnoozeConversation(req.tenantId, req.params.id);
 
     res.json({
       success: true,

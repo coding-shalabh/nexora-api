@@ -2,6 +2,8 @@ import { prisma } from '@crm360/database';
 import { NotFoundError } from '@crm360/shared';
 import { eventBus, createEvent, EventTypes } from '../../common/events/event-bus.js';
 import { nanoid } from 'nanoid';
+import { razorpayService } from '../../services/razorpay.service.js';
+import { logger } from '../../common/logger.js';
 
 class BillingService {
   async getQuotes(tenantId, filters) {
@@ -12,7 +14,7 @@ class BillingService {
       prisma.quote.findMany({
         where,
         include: {
-          lineItems: true,
+          lines: true,
         },
         skip: (filters.page - 1) * filters.limit,
         take: filters.limit,
@@ -71,7 +73,7 @@ class BillingService {
         },
       },
       include: {
-        lineItems: true,
+        lines: true,
       },
     });
 
@@ -88,7 +90,7 @@ class BillingService {
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     const updated = await prisma.quote.update({
@@ -109,7 +111,7 @@ class BillingService {
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     const updated = await prisma.quote.update({
@@ -126,15 +128,33 @@ class BillingService {
   }
 
   async getInvoices(tenantId, filters) {
-    // TODO: Invoices feature not yet implemented - Invoice model doesn't exist
-    // Return empty data with proper structure
+    const where = { tenantId };
+    if (filters.status) where.status = filters.status;
+
+    const [invoices, total] = await Promise.all([
+      prisma.invoice.findMany({
+        where,
+        include: {
+          lines: true,
+          contact: { select: { id: true, firstName: true, lastName: true, email: true } },
+          payments: {
+            select: { id: true, amount: true, status: true, method: true, createdAt: true },
+          },
+        },
+        skip: ((filters.page || 1) - 1) * (filters.limit || 25),
+        take: filters.limit || 25,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.invoice.count({ where }),
+    ]);
+
     return {
-      invoices: [],
+      invoices,
       meta: {
-        total: 0,
+        total,
         page: filters.page || 1,
         limit: filters.limit || 25,
-        totalPages: 0,
+        totalPages: Math.ceil(total / (filters.limit || 25)),
       },
     };
   }
@@ -154,7 +174,7 @@ class BillingService {
       });
 
       if (!quote) {
-        throw new NotFoundError('Quote not found');
+        throw new NotFoundError('Quote');
       }
 
       // Transform quote lines to invoice items format
@@ -240,8 +260,8 @@ class BillingService {
         totalPrice,
         order: index,
         // GST fields
-        hsnCode: item.hsnCode,
-        sacCode: item.sacCode,
+        hsnCode: item.hsnCode || null,
+        sacCode: item.sacCode || null,
         unit: item.unit || 'NOS',
         productType: item.sacCode ? 'SERVICES' : 'GOODS',
         taxableValue,
@@ -259,12 +279,13 @@ class BillingService {
 
     const totalAmount = subtotal + totalTax;
 
+    // Use Prisma relation connect pattern (Prisma 5.x requires this for FK fields)
     const invoice = await prisma.invoice.create({
       data: {
         tenantId,
         invoiceNumber: `INV-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`,
-        contactId: data.contactId,
-        quoteId: data.quoteId,
+        ...(data.contactId && { contact: { connect: { id: data.contactId } } }),
+        ...(data.quoteId && { quote: { connect: { id: data.quoteId } } }),
         status: 'DRAFT',
         subtotal,
         taxAmount: totalTax,
@@ -274,9 +295,9 @@ class BillingService {
         balanceDue: totalAmount,
         currency: isGstInvoice ? 'INR' : 'USD',
         dueDate: new Date(data.dueDate),
-        notes: data.notes,
-        terms: data.terms,
         createdById: userId,
+        notes: data.notes || null,
+        terms: data.terms || null,
 
         // GST Invoice Fields
         isGstInvoice,
@@ -284,26 +305,26 @@ class BillingService {
         supplyType: data.supplyType || 'B2B',
 
         // Seller Info (from tenant)
-        sellerGstin: tenant?.gstin,
-        sellerLegalName: tenant?.legalName || tenant?.name,
-        sellerTradeName: tenant?.tradeName,
-        sellerAddress: tenant?.registeredAddress || tenant?.address,
-        sellerStateCode: tenant?.stateCode,
-        sellerStateName: tenant?.stateName,
+        sellerGstin: tenant?.gstin || null,
+        sellerLegalName: tenant?.legalName || tenant?.name || null,
+        sellerTradeName: tenant?.tradeName || null,
+        sellerAddress: tenant?.registeredAddress || tenant?.address || null,
+        sellerStateCode: tenant?.stateCode || null,
+        sellerStateName: tenant?.stateName || null,
 
         // Buyer Info
-        buyerGstin: data.buyerGstin,
-        buyerLegalName: data.buyerLegalName,
-        buyerAddress: data.buyerAddress,
-        buyerStateCode: data.buyerStateCode,
+        buyerGstin: data.buyerGstin || null,
+        buyerLegalName: data.buyerLegalName || null,
+        buyerAddress: data.buyerAddress || null,
+        buyerStateCode: data.buyerStateCode || null,
 
         // Shipping
-        shipToName: data.shipToName,
-        shipToAddress: data.shipToAddress,
-        shipToStateCode: data.shipToStateCode,
+        shipToName: data.shipToName || null,
+        shipToAddress: data.shipToAddress || null,
+        shipToStateCode: data.shipToStateCode || null,
 
         // Place of Supply
-        placeOfSupply: data.placeOfSupply,
+        placeOfSupply: data.placeOfSupply || null,
         isInterState,
 
         // GST Totals
@@ -315,17 +336,17 @@ class BillingService {
 
         // Other
         isReverseCharge: data.isReverseCharge || false,
-        transporterName: data.transporterName,
-        vehicleNumber: data.vehicleNumber,
-        eWayBillNumber: data.eWayBillNumber,
+        transporterName: data.transporterName || null,
+        vehicleNumber: data.vehicleNumber || null,
+        eWayBillNumber: data.eWayBillNumber || null,
         financialYear: this.getFinancialYear(),
 
-        lineItems: {
+        lines: {
           create: lineItemsData,
         },
       },
       include: {
-        lineItems: true,
+        lines: true,
       },
     });
 
@@ -353,7 +374,7 @@ class BillingService {
     });
 
     if (!invoice) {
-      throw new NotFoundError('Invoice not found');
+      throw new NotFoundError('Invoice');
     }
 
     const updated = await prisma.invoice.update({
@@ -402,7 +423,7 @@ class BillingService {
     });
 
     if (!invoice) {
-      throw new NotFoundError('Invoice not found');
+      throw new NotFoundError('Invoice');
     }
 
     const amount = data.amount;
@@ -453,12 +474,12 @@ class BillingService {
       include: {
         contact: true,
         deal: { select: { id: true, name: true } },
-        lineItems: true,
+        lines: true,
       },
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     return quote;
@@ -470,7 +491,7 @@ class BillingService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     if (existing.status === 'ACCEPTED') {
@@ -501,7 +522,7 @@ class BillingService {
         expiryDate: data.validUntil ? new Date(data.validUntil) : undefined,
       },
       include: {
-        lineItems: true,
+        lines: true,
       },
     });
 
@@ -514,7 +535,7 @@ class BillingService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     if (existing.status === 'ACCEPTED') {
@@ -532,7 +553,7 @@ class BillingService {
     });
 
     if (!quote) {
-      throw new NotFoundError('Quote not found');
+      throw new NotFoundError('Quote');
     }
 
     const updated = await prisma.quote.update({
@@ -557,12 +578,12 @@ class BillingService {
         payments: {
           orderBy: { createdAt: 'desc' },
         },
-        lineItems: true,
+        lines: true,
       },
     });
 
     if (!invoice) {
-      throw new NotFoundError('Invoice not found');
+      throw new NotFoundError('Invoice');
     }
 
     return invoice;
@@ -574,7 +595,7 @@ class BillingService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Invoice not found');
+      throw new NotFoundError('Invoice');
     }
 
     if (existing.status === 'PAID') {
@@ -607,7 +628,7 @@ class BillingService {
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       },
       include: {
-        lineItems: true,
+        lines: true,
       },
     });
 
@@ -620,7 +641,7 @@ class BillingService {
     });
 
     if (!existing) {
-      throw new NotFoundError('Invoice not found');
+      throw new NotFoundError('Invoice');
     }
 
     if (Number(existing.paidAmount) > 0) {
@@ -638,7 +659,7 @@ class BillingService {
     });
 
     if (!invoice) {
-      throw new NotFoundError('Invoice not found');
+      throw new NotFoundError('Invoice');
     }
 
     const updated = await prisma.invoice.update({
@@ -667,7 +688,7 @@ class BillingService {
     });
 
     if (!payment) {
-      throw new NotFoundError('Payment not found');
+      throw new NotFoundError('Payment');
     }
 
     return payment;
@@ -680,7 +701,7 @@ class BillingService {
     });
 
     if (!payment) {
-      throw new NotFoundError('Payment not found');
+      throw new NotFoundError('Payment');
     }
 
     if (payment.status === 'REFUNDED') {
@@ -710,6 +731,744 @@ class BillingService {
     ]);
 
     return { success: true, refundAmount };
+  }
+
+  // ============ PLANS (from DB) ============
+
+  /**
+   * Fetch all active plans from the database.
+   */
+  async getPlans() {
+    const plans = await prisma.plan.findMany({
+      where: { isActive: true, isPublic: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return plans;
+  }
+
+  /**
+   * Fetch a single plan by ID.
+   */
+  async getPlan(planId) {
+    const plan = await prisma.plan.findUnique({
+      where: { id: planId },
+    });
+
+    if (!plan) {
+      throw new NotFoundError('Plan');
+    }
+
+    return plan;
+  }
+
+  // ============ SUBSCRIPTION MANAGEMENT ============
+
+  /**
+   * Get the current subscription for a tenant, including plan details.
+   */
+  async getSubscription(tenantId) {
+    const subscription = await prisma.subscription.findFirst({
+      where: { tenantId },
+      include: {
+        plan: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!subscription) {
+      return null;
+    }
+
+    return subscription;
+  }
+
+  /**
+   * Create a new subscription for a tenant.
+   * If a TRIALING subscription exists, it transitions to ACTIVE.
+   * @param {string} tenantId
+   * @param {string} planId - Internal plan ID
+   * @param {string} billingCycle - 'MONTHLY' or 'YEARLY'
+   * @param {object} paymentData - Razorpay payment details
+   */
+  async createSubscription(tenantId, planId, billingCycle, paymentData = {}) {
+    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan) {
+      throw new NotFoundError('Plan');
+    }
+
+    // Calculate end date based on billing cycle
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    if (billingCycle === 'YEARLY') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
+
+    // Check for existing subscription
+    const existing = await prisma.subscription.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let subscription;
+
+    if (existing && (existing.status === 'TRIALING' || existing.status === 'EXPIRED')) {
+      // Upgrade trial or expired subscription to active
+      subscription = await prisma.subscription.update({
+        where: { id: existing.id },
+        data: {
+          planId,
+          status: 'ACTIVE',
+          billingCycle,
+          startDate,
+          endDate,
+          trialEndsAt: null,
+          cancelledAt: null,
+          stripeCustomerId: paymentData.razorpayCustomerId || existing.stripeCustomerId,
+          stripeSubscriptionId: paymentData.razorpaySubscriptionId || existing.stripeSubscriptionId,
+        },
+        include: { plan: true },
+      });
+    } else if (existing && existing.status === 'ACTIVE') {
+      // Plan upgrade/change -- update existing
+      subscription = await prisma.subscription.update({
+        where: { id: existing.id },
+        data: {
+          planId,
+          billingCycle,
+          startDate,
+          endDate,
+          stripeSubscriptionId: paymentData.razorpaySubscriptionId || existing.stripeSubscriptionId,
+        },
+        include: { plan: true },
+      });
+    } else {
+      // Create new subscription
+      subscription = await prisma.subscription.create({
+        data: {
+          tenantId,
+          planId,
+          status: 'ACTIVE',
+          billingCycle,
+          startDate,
+          endDate,
+          seats: plan.maxUsers || 1,
+          stripeCustomerId: paymentData.razorpayCustomerId || null,
+          stripeSubscriptionId: paymentData.razorpaySubscriptionId || null,
+        },
+        include: { plan: true },
+      });
+    }
+
+    logger.info(
+      { tenantId, planId, billingCycle, subscriptionId: subscription.id },
+      'Subscription created/updated'
+    );
+
+    return subscription;
+  }
+
+  /**
+   * Cancel a tenant's active subscription.
+   */
+  async cancelSubscription(tenantId) {
+    const subscription = await prisma.subscription.findFirst({
+      where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!subscription) {
+      throw new NotFoundError('Active subscription');
+    }
+
+    // If there's a Razorpay subscription, cancel it there too
+    if (subscription.stripeSubscriptionId) {
+      try {
+        await razorpayService.cancelSubscription(subscription.stripeSubscriptionId, true);
+      } catch (error) {
+        logger.warn(
+          { error: error.message, subscriptionId: subscription.stripeSubscriptionId },
+          'Failed to cancel Razorpay subscription (may already be cancelled)'
+        );
+      }
+    }
+
+    const updated = await prisma.subscription.update({
+      where: { id: subscription.id },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+      },
+      include: { plan: true },
+    });
+
+    eventBus.publish(
+      createEvent(EventTypes.SUBSCRIPTION_CANCELLED || 'subscription.cancelled', tenantId, {
+        subscriptionId: updated.id,
+      })
+    );
+
+    return updated;
+  }
+
+  /**
+   * Upgrade a tenant to a new plan.
+   */
+  async upgradePlan(tenantId, newPlanId, billingCycle) {
+    const plan = await prisma.plan.findUnique({ where: { id: newPlanId } });
+    if (!plan) {
+      throw new NotFoundError('Plan');
+    }
+
+    return this.createSubscription(tenantId, newPlanId, billingCycle);
+  }
+
+  // ============ RAZORPAY CHECKOUT ============
+
+  /**
+   * Create a Razorpay order for plan checkout.
+   * @param {string} tenantId
+   * @param {string} planId - Internal plan ID
+   * @param {string} billingCycle - 'MONTHLY' or 'YEARLY'
+   * @returns {object} { orderId, amount, currency, key }
+   */
+  async createCheckoutOrder(tenantId, planId, billingCycle) {
+    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan) {
+      throw new NotFoundError('Plan');
+    }
+
+    // Calculate amount in paise (smallest currency unit for INR)
+    const price = billingCycle === 'YEARLY' ? plan.yearlyPrice : plan.monthlyPrice;
+    const amountInPaise = Math.round(Number(price) * 100);
+
+    if (amountInPaise <= 0) {
+      throw new Error('Cannot create a checkout order for a free plan');
+    }
+
+    const receipt = `rcpt_${tenantId}_${nanoid(8)}`;
+
+    const order = await razorpayService.createOrder(
+      amountInPaise,
+      plan.currency || 'INR',
+      receipt,
+      {
+        tenantId,
+        planId,
+        planName: plan.displayName,
+        billingCycle,
+      }
+    );
+
+    return {
+      orderId: order.id,
+      amount: amountInPaise,
+      currency: plan.currency || 'INR',
+      key: razorpayService.getKeyId(),
+      planName: plan.displayName,
+      billingCycle,
+    };
+  }
+
+  /**
+   * Verify a Razorpay payment and activate the subscription.
+   * Creates Subscription, Payment, and Invoice records.
+   */
+  async verifyAndActivatePayment(tenantId, userId, data) {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, planId, billingCycle } =
+      data;
+
+    // 1. Verify signature
+    const isValid = razorpayService.verifyPaymentSignature(
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
+    );
+
+    if (!isValid) {
+      throw new Error('Payment verification failed: invalid signature');
+    }
+
+    // 2. Fetch payment details from Razorpay
+    const paymentDetails = await razorpayService.fetchPayment(razorpay_payment_id);
+
+    // 3. Get plan
+    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan) {
+      throw new NotFoundError('Plan');
+    }
+
+    const price = billingCycle === 'YEARLY' ? plan.yearlyPrice : plan.monthlyPrice;
+    const amount = Number(price);
+
+    // 4. Use a transaction to create all records atomically
+    const result = await prisma.$transaction(async (tx) => {
+      // Create/update subscription
+      const subscription = await this._upsertSubscription(tx, tenantId, planId, billingCycle, {
+        razorpayCustomerId: paymentDetails.customer_id || null,
+      });
+
+      // Create invoice
+      const invoice = await tx.invoice.create({
+        data: {
+          tenantId,
+          invoiceNumber: `INV-SUB-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`,
+          status: 'PAID',
+          subtotal: amount,
+          taxAmount: 0,
+          discountAmount: 0,
+          totalAmount: amount,
+          paidAmount: amount,
+          balanceDue: 0,
+          currency: plan.currency || 'INR',
+          dueDate: new Date(),
+          paidAt: new Date(),
+          createdById: userId,
+          notes: `Subscription payment for ${plan.displayName} (${billingCycle})`,
+          financialYear: this.getFinancialYear(),
+          lines: {
+            create: [
+              {
+                description: `${plan.displayName} - ${billingCycle === 'YEARLY' ? 'Annual' : 'Monthly'} subscription`,
+                quantity: 1,
+                unitPrice: amount,
+                totalPrice: amount,
+                order: 0,
+              },
+            ],
+          },
+        },
+      });
+
+      // Create payment record
+      const payment = await tx.payment.create({
+        data: {
+          tenantId,
+          invoiceId: invoice.id,
+          amount,
+          currency: plan.currency || 'INR',
+          method: this._mapRazorpayMethod(paymentDetails.method),
+          providerPaymentId: razorpay_payment_id,
+          providerData: {
+            razorpayOrderId: razorpay_order_id,
+            razorpayPaymentId: razorpay_payment_id,
+            method: paymentDetails.method,
+            bank: paymentDetails.bank,
+            wallet: paymentDetails.wallet,
+            vpa: paymentDetails.vpa,
+            email: paymentDetails.email,
+            contact: paymentDetails.contact,
+          },
+          status: 'COMPLETED',
+          processedAt: new Date(),
+        },
+      });
+
+      return { subscription, invoice, payment };
+    });
+
+    logger.info(
+      {
+        tenantId,
+        planId,
+        paymentId: razorpay_payment_id,
+        subscriptionId: result.subscription.id,
+      },
+      'Payment verified and subscription activated'
+    );
+
+    return result;
+  }
+
+  /**
+   * Internal helper: upsert subscription within a transaction.
+   */
+  async _upsertSubscription(tx, tenantId, planId, billingCycle, extras = {}) {
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    if (billingCycle === 'YEARLY') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
+
+    const plan = await tx.plan.findUnique({ where: { id: planId } });
+
+    const existing = await tx.subscription.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existing) {
+      return tx.subscription.update({
+        where: { id: existing.id },
+        data: {
+          planId,
+          status: 'ACTIVE',
+          billingCycle,
+          startDate,
+          endDate,
+          trialEndsAt: null,
+          cancelledAt: null,
+          ...(extras.razorpayCustomerId && {
+            stripeCustomerId: extras.razorpayCustomerId,
+          }),
+        },
+        include: { plan: true },
+      });
+    }
+
+    return tx.subscription.create({
+      data: {
+        tenantId,
+        planId,
+        status: 'ACTIVE',
+        billingCycle,
+        startDate,
+        endDate,
+        seats: plan?.maxUsers || 1,
+        ...(extras.razorpayCustomerId && {
+          stripeCustomerId: extras.razorpayCustomerId,
+        }),
+      },
+      include: { plan: true },
+    });
+  }
+
+  // ============ PAYMENT TRACKING ============
+
+  /**
+   * Record a successful Razorpay payment.
+   */
+  async handlePaymentSuccess(tenantId, razorpayPaymentId, razorpayOrderId, amount, planId) {
+    // Check if payment already recorded (idempotency)
+    const existingPayment = await prisma.payment.findFirst({
+      where: { providerPaymentId: razorpayPaymentId },
+    });
+
+    if (existingPayment) {
+      logger.info({ razorpayPaymentId }, 'Payment already recorded, skipping');
+      return existingPayment;
+    }
+
+    const plan = await prisma.plan.findUnique({ where: { id: planId } });
+    const paymentDetails = await razorpayService.fetchPayment(razorpayPaymentId);
+
+    // Find or create an invoice for this payment
+    const invoice = await prisma.invoice.create({
+      data: {
+        tenantId,
+        invoiceNumber: `INV-RZP-${new Date().getFullYear()}-${nanoid(6).toUpperCase()}`,
+        status: 'PAID',
+        subtotal: amount,
+        taxAmount: 0,
+        discountAmount: 0,
+        totalAmount: amount,
+        paidAmount: amount,
+        balanceDue: 0,
+        currency: plan?.currency || 'INR',
+        dueDate: new Date(),
+        paidAt: new Date(),
+        createdById: 'system',
+        notes: `Razorpay payment ${razorpayPaymentId}`,
+        financialYear: this.getFinancialYear(),
+      },
+    });
+
+    const payment = await prisma.payment.create({
+      data: {
+        tenantId,
+        invoiceId: invoice.id,
+        amount,
+        currency: plan?.currency || 'INR',
+        method: this._mapRazorpayMethod(paymentDetails.method),
+        providerPaymentId: razorpayPaymentId,
+        providerData: {
+          razorpayOrderId,
+          razorpayPaymentId,
+          method: paymentDetails.method,
+          bank: paymentDetails.bank,
+          wallet: paymentDetails.wallet,
+          vpa: paymentDetails.vpa,
+        },
+        status: 'COMPLETED',
+        processedAt: new Date(),
+      },
+    });
+
+    return payment;
+  }
+
+  /**
+   * Record a failed payment attempt.
+   */
+  async handlePaymentFailure(tenantId, razorpayPaymentId, reason) {
+    logger.warn({ tenantId, razorpayPaymentId, reason }, 'Payment failed');
+
+    // Find the subscription and set to PAST_DUE
+    const subscription = await prisma.subscription.findFirst({
+      where: { tenantId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (subscription) {
+      await prisma.subscription.update({
+        where: { id: subscription.id },
+        data: { status: 'PAST_DUE' },
+      });
+    }
+
+    // Record the failed payment if we can find an invoice
+    const latestInvoice = await prisma.invoice.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (latestInvoice) {
+      await prisma.payment.create({
+        data: {
+          tenantId,
+          invoiceId: latestInvoice.id,
+          amount: 0,
+          currency: 'INR',
+          method: 'OTHER',
+          providerPaymentId: razorpayPaymentId,
+          providerData: { reason, razorpayPaymentId },
+          status: 'FAILED',
+        },
+      });
+    }
+
+    return { recorded: true };
+  }
+
+  // ============ DUNNING ============
+
+  /**
+   * Get dunning status: overdue invoices and failed payments.
+   */
+  async getDunningStatus(tenantId) {
+    const [overdueInvoices, failedPayments, subscription] = await Promise.all([
+      prisma.invoice.findMany({
+        where: {
+          tenantId,
+          status: { in: ['SENT', 'OVERDUE'] },
+          dueDate: { lt: new Date() },
+        },
+        orderBy: { dueDate: 'asc' },
+      }),
+      prisma.payment.findMany({
+        where: {
+          tenantId,
+          status: 'FAILED',
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      prisma.subscription.findFirst({
+        where: { tenantId },
+        include: { plan: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    return {
+      subscription: subscription
+        ? {
+            id: subscription.id,
+            status: subscription.status,
+            planName: subscription.plan.displayName,
+          }
+        : null,
+      overdueInvoices: overdueInvoices.map((inv) => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        totalAmount: Number(inv.totalAmount),
+        balanceDue: Number(inv.balanceDue),
+        dueDate: inv.dueDate,
+        daysPastDue: Math.floor((Date.now() - inv.dueDate.getTime()) / (1000 * 60 * 60 * 24)),
+      })),
+      failedPayments: failedPayments.map((p) => ({
+        id: p.id,
+        amount: Number(p.amount),
+        providerPaymentId: p.providerPaymentId,
+        reason: p.providerData?.reason || 'Unknown',
+        createdAt: p.createdAt,
+      })),
+      totalOverdue: overdueInvoices.reduce((sum, inv) => sum + Number(inv.balanceDue), 0),
+      hasOverduePayments: overdueInvoices.length > 0 || failedPayments.length > 0,
+    };
+  }
+
+  /**
+   * Retry a failed payment using the original Razorpay payment reference.
+   */
+  async retryFailedPayment(tenantId, paymentId) {
+    const payment = await prisma.payment.findFirst({
+      where: { id: paymentId, tenantId, status: 'FAILED' },
+      include: { invoice: true },
+    });
+
+    if (!payment) {
+      throw new NotFoundError('Failed payment');
+    }
+
+    // Create a new Razorpay order for the retry
+    const amount = Number(payment.invoice.balanceDue) || Number(payment.invoice.totalAmount);
+    const amountInPaise = Math.round(amount * 100);
+
+    const receipt = `retry_${tenantId}_${nanoid(8)}`;
+    const order = await razorpayService.createOrder(
+      amountInPaise,
+      payment.currency || 'INR',
+      receipt,
+      {
+        tenantId,
+        retryOf: paymentId,
+        invoiceId: payment.invoiceId,
+      }
+    );
+
+    return {
+      orderId: order.id,
+      amount: amountInPaise,
+      currency: payment.currency || 'INR',
+      key: razorpayService.getKeyId(),
+      invoiceId: payment.invoiceId,
+      originalPaymentId: paymentId,
+    };
+  }
+
+  // ============ WEBHOOK HANDLING ============
+
+  /**
+   * Process a Razorpay webhook event.
+   */
+  async handleWebhookEvent(event, payload) {
+    const entity = payload.payment?.entity || payload.subscription?.entity || {};
+
+    switch (event) {
+      case 'payment.captured': {
+        const { id: paymentId, order_id: orderId, amount, notes } = entity;
+        const tenantId = notes?.tenantId;
+        const planId = notes?.planId;
+
+        if (tenantId && planId) {
+          await this.handlePaymentSuccess(
+            tenantId,
+            paymentId,
+            orderId,
+            amount / 100, // Convert from paise
+            planId
+          );
+        }
+        break;
+      }
+
+      case 'payment.failed': {
+        const { id: paymentId, notes, error_description } = entity;
+        const tenantId = notes?.tenantId;
+
+        if (tenantId) {
+          await this.handlePaymentFailure(tenantId, paymentId, error_description);
+        }
+        break;
+      }
+
+      case 'subscription.charged': {
+        const subscriptionEntity = payload.subscription?.entity || {};
+        const { id: rzpSubId, plan_id, notes: subNotes } = subscriptionEntity;
+        const tenantId = subNotes?.tenantId;
+
+        if (tenantId) {
+          // Update subscription as active
+          const subscription = await prisma.subscription.findFirst({
+            where: {
+              tenantId,
+              stripeSubscriptionId: rzpSubId,
+            },
+          });
+
+          if (subscription) {
+            await prisma.subscription.update({
+              where: { id: subscription.id },
+              data: { status: 'ACTIVE' },
+            });
+          }
+        }
+        break;
+      }
+
+      case 'subscription.cancelled': {
+        const subscriptionEntity = payload.subscription?.entity || {};
+        const { id: rzpSubId } = subscriptionEntity;
+
+        const subscription = await prisma.subscription.findFirst({
+          where: { stripeSubscriptionId: rzpSubId },
+        });
+
+        if (subscription) {
+          await prisma.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              status: 'CANCELLED',
+              cancelledAt: new Date(),
+            },
+          });
+        }
+        break;
+      }
+
+      default:
+        logger.info({ event }, 'Unhandled Razorpay webhook event');
+    }
+  }
+
+  // ============ TRIAL MANAGEMENT ============
+
+  /**
+   * Check and expire trials that have passed their end date.
+   * Can be called from a cron job or on-demand.
+   */
+  async expireTrials() {
+    const expiredTrials = await prisma.subscription.findMany({
+      where: {
+        status: 'TRIALING',
+        trialEndsAt: { lte: new Date() },
+      },
+    });
+
+    const results = [];
+    for (const sub of expiredTrials) {
+      const updated = await prisma.subscription.update({
+        where: { id: sub.id },
+        data: { status: 'EXPIRED' },
+      });
+      results.push(updated);
+      logger.info({ tenantId: sub.tenantId, subscriptionId: sub.id }, 'Trial expired');
+    }
+
+    return { expired: results.length, subscriptions: results };
+  }
+
+  // ============ HELPERS ============
+
+  /**
+   * Map Razorpay payment method to our PaymentMethod enum.
+   */
+  _mapRazorpayMethod(razorpayMethod) {
+    const methodMap = {
+      card: 'CARD',
+      netbanking: 'BANK_TRANSFER',
+      wallet: 'WALLET',
+      upi: 'UPI',
+      bank_transfer: 'BANK_TRANSFER',
+      emi: 'CARD',
+    };
+
+    return methodMap[razorpayMethod] || 'OTHER';
   }
 }
 

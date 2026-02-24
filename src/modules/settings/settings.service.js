@@ -4,7 +4,8 @@
  */
 
 import { prisma } from '@crm360/database';
-import { NotFoundError } from '@crm360/shared';
+import { NotFoundError, UnauthorizedError } from '@crm360/shared';
+import { hashPassword, verifyPassword } from '../../common/auth.js';
 import crypto from 'crypto';
 
 class SettingsService {
@@ -97,19 +98,22 @@ class SettingsService {
     });
 
     if (!user) {
-      throw new NotFoundError('User not found');
+      throw new NotFoundError('User');
     }
 
-    // TODO: Verify current password with bcrypt
-    // const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    // Verify current password
+    const isValid = await verifyPassword(currentPassword, user.passwordHash);
+    if (!isValid) {
+      throw new UnauthorizedError('Current password is incorrect');
+    }
 
-    // Hash new password
-    // const newHash = await bcrypt.hash(newPassword, 12);
+    // Hash new password (bcrypt with 12 rounds via common/auth.js)
+    const newHash = await hashPassword(newPassword);
 
     await prisma.user.update({
       where: { id: userId },
       data: {
-        // passwordHash: newHash,
+        passwordHash: newHash,
         updatedAt: new Date(),
       },
     });
@@ -285,23 +289,37 @@ class SettingsService {
   }
 
   async updateOrganizationSettings(tenantId, data) {
+    // Fetch existing settings first so we can deep-merge rather than replace
+    let existingSettings = {};
+    if (data.settings !== undefined) {
+      const current = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { settings: true },
+      });
+      existingSettings = current?.settings || {};
+    }
+
+    const mergedSettings =
+      data.settings !== undefined ? { ...existingSettings, ...data.settings } : undefined;
+
+    // Build update payload, only include defined fields
+    const updateData = { updatedAt: new Date() };
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.website !== undefined) updateData.website = data.website;
+    if (data.timezone !== undefined) updateData.timezone = data.timezone;
+    if (data.currency !== undefined) updateData.currency = data.currency;
+    if (data.locale !== undefined) updateData.locale = data.locale;
+    if (data.industry !== undefined) updateData.industry = data.industry;
+    if (data.size !== undefined) updateData.size = data.size;
+    if (mergedSettings !== undefined) updateData.settings = mergedSettings;
+
     const tenant = await prisma.tenant.update({
       where: { id: tenantId },
-      data: {
-        name: data.name,
-        logoUrl: data.logoUrl,
-        address: data.address,
-        phone: data.phone,
-        email: data.email,
-        website: data.website,
-        timezone: data.timezone,
-        currency: data.currency,
-        locale: data.locale,
-        industry: data.industry,
-        size: data.size,
-        settings: data.settings,
-        updatedAt: new Date(),
-      },
+      data: updateData,
       select: {
         id: true,
         name: true,

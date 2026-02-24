@@ -142,7 +142,7 @@ class AuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: 31536000, // 1 year
+      expiresIn: 900, // 15 minutes
       user: {
         id: result.user.id,
         email: result.user.email,
@@ -264,7 +264,7 @@ class AuthService {
     return {
       accessToken,
       refreshToken,
-      expiresIn: 31536000, // 1 year
+      expiresIn: 900, // 15 minutes
       user: {
         id: user.id,
         email: user.email,
@@ -322,7 +322,7 @@ class AuthService {
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      expiresIn: 31536000, // 1 year
+      expiresIn: 900, // 15 minutes
     };
   }
 

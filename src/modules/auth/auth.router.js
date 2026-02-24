@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { authRateLimiter } from '../../common/middleware/rate-limiter.js';
 import { authenticate } from '../../common/middleware/authenticate.js';
 import { authService } from './auth.service.js';
+import { SignupService } from './signup.service.js';
 
 const router = Router();
 
@@ -21,6 +22,24 @@ const loginSchema = z.object({
   password: z.string(),
 });
 
+const signupSchema = z.object({
+  email: z.string().email(),
+  password: z
+    .string()
+    .min(8)
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])/,
+      'Password must contain uppercase, lowercase, number, and special character'
+    ),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  companyName: z.string().min(2, 'Company name must be at least 2 characters').max(100),
+  companySize: z.enum(['1-10', '11-50', '51-200', '201-500', '500+']).optional(),
+  industry: z.string().optional(),
+  timezone: z.string().default('Asia/Kolkata'),
+  currency: z.string().default('INR'),
+  sampleData: z.boolean().default(false),
+});
+
 const refreshSchema = z.object({
   refreshToken: z.string(),
 });
@@ -36,6 +55,33 @@ router.post('/register', authRateLimiter, async (req, res, next) => {
       data: result,
     });
   } catch (error) {
+    next(error);
+  }
+});
+
+// Complete signup flow with tenant creation
+router.post('/signup', authRateLimiter, async (req, res, next) => {
+  try {
+    const data = signupSchema.parse(req.body);
+    const result = await SignupService.register(data);
+
+    res.status(201).json({
+      success: true,
+      data: result,
+      message: 'Account created successfully! Please check your email to verify your account.',
+    });
+  } catch (error) {
+    // Handle specific errors
+    if (error.message === 'Email already exists') {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'EMAIL_EXISTS',
+          message: 'An account with this email already exists',
+        },
+      });
+    }
+
     next(error);
   }
 });
@@ -114,10 +160,12 @@ router.post('/forgot-password', authRateLimiter, async (req, res, next) => {
 
 router.post('/reset-password', authRateLimiter, async (req, res, next) => {
   try {
-    const data = z.object({
-      token: z.string(),
-      password: z.string().min(8),
-    }).parse(req.body);
+    const data = z
+      .object({
+        token: z.string(),
+        password: z.string().min(8),
+      })
+      .parse(req.body);
 
     await authService.resetPassword(data.token, data.password);
 

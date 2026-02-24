@@ -1,0 +1,3182 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Nexora CRM360 — Mock APIs",
+    "description": "Complete mock API collection for Nexora CRM360 development.\n\nCovers: MSG91 WhatsApp, MSG91 SMS, Fast2SMS, TeleCMI Voice, Resend Email, and AI Services.\n\nSetup: Import → Create Mock Server → Copy URL → Paste in Settings → Integrations → Postman.",
+    "version": "1.0.0"
+  },
+  "tags": [],
+  "paths": {
+    "/api/v5/whatsapp/whatsapp-outbound-message/": {
+      "post": {
+        "summary": "Send Text Message",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "integrated_number": {
+                    "type": "string"
+                  },
+                  "content_type": {
+                    "type": "string"
+                  },
+                  "recipient_number": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "integrated_number",
+                  "content_type",
+                  "recipient_number",
+                  "text"
+                ]
+              },
+              "example": {
+                "integrated_number": "{{integratedNumber}}",
+                "content_type": "text",
+                "recipient_number": "{{recipientNumber}}",
+                "text": "Hello! Thank you for contacting Nexora. How can we help you today?"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message_uuid": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "message_uuid",
+                        "id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "message",
+                    "request_id",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "message": "Message sent successfully",
+                  "request_id": "mock-wa-msg-a1b2c3d4e5",
+                  "data": {
+                    "message_uuid": "mock-uuid-wa-001",
+                    "id": "wamid.mock001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/whatsapp/whatsapp-outbound-message/bulk/": {
+      "post": {
+        "summary": "Send Bulk/Template Message",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "integrated_number": {
+                    "type": "string"
+                  },
+                  "content_type": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string"
+                      },
+                      "template": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "language": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "policy": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "policy"
+                            ]
+                          },
+                          "to_and_components": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "to": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "components": {
+                                  "type": "object",
+                                  "properties": {
+                                    "body": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "type": {
+                                            "type": "string"
+                                          },
+                                          "text": {
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "body"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "language",
+                          "to_and_components"
+                        ]
+                      },
+                      "messaging_product": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type",
+                      "template",
+                      "messaging_product"
+                    ]
+                  }
+                },
+                "required": [
+                  "integrated_number",
+                  "content_type",
+                  "payload"
+                ]
+              },
+              "example": {
+                "integrated_number": "{{integratedNumber}}",
+                "content_type": "template",
+                "payload": {
+                  "type": "template",
+                  "template": {
+                    "name": "order_confirmation",
+                    "language": {
+                      "code": "en",
+                      "policy": "deterministic"
+                    },
+                    "to_and_components": [
+                      {
+                        "to": [
+                          "{{recipientNumber}}"
+                        ],
+                        "components": {
+                          "body": [
+                            {
+                              "type": "text",
+                              "text": "ORD-2024-1234"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "messaging_product": "whatsapp"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "message",
+                    "request_id",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "message": "Bulk message sent successfully",
+                  "request_id": "mock-wa-bulk-f6g7h8i9j0",
+                  "data": {
+                    "id": "wamid.mock-bulk-001"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/whatsapp/whatsapp-activation/": {
+      "get": {
+        "summary": "Get Integrated Numbers",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "integrated_number": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "string"
+                          },
+                          "business_name": {
+                            "type": "string"
+                          },
+                          "verified": {
+                            "type": "boolean"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "quality_rating": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "integrated_number",
+                          "number",
+                          "business_name",
+                          "verified",
+                          "status",
+                          "quality_rating"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "data": [
+                    {
+                      "id": "mock-num-001",
+                      "integrated_number": "+919876500001",
+                      "number": "919876500001",
+                      "business_name": "Nexora Technologies Pvt Ltd",
+                      "verified": true,
+                      "status": "ACTIVE",
+                      "quality_rating": "GREEN"
+                    },
+                    {
+                      "id": "mock-num-002",
+                      "integrated_number": "+919876500002",
+                      "number": "919876500002",
+                      "business_name": "Nexora Support",
+                      "verified": true,
+                      "status": "ACTIVE",
+                      "quality_rating": "GREEN"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/whatsapp/get-template-client/integratedNumber": {
+      "get": {
+        "summary": "Get Templates",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "languages": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "language": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                },
+                                "code": {
+                                  "type": "string"
+                                },
+                                "variables": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "language",
+                                "status",
+                                "code",
+                                "variables"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "category",
+                          "languages"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "data": [
+                    {
+                      "id": "tmpl-001",
+                      "name": "welcome_message",
+                      "category": "UTILITY",
+                      "languages": [
+                        {
+                          "language": "en",
+                          "status": "APPROVED",
+                          "code": "Welcome to {{1}}! We're excited to have you on board.",
+                          "variables": [
+                            "company_name"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tmpl-002",
+                      "name": "order_confirmation",
+                      "category": "UTILITY",
+                      "languages": [
+                        {
+                          "language": "en",
+                          "status": "APPROVED",
+                          "code": "Your order {{1}} has been confirmed. Expected delivery: {{2}}.",
+                          "variables": [
+                            "order_id",
+                            "delivery_date"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tmpl-003",
+                      "name": "payment_receipt",
+                      "category": "UTILITY",
+                      "languages": [
+                        {
+                          "language": "en",
+                          "status": "APPROVED",
+                          "code": "Payment of ₹{{1}} received. Transaction ID: {{2}}. Thank you!",
+                          "variables": [
+                            "amount",
+                            "txn_id"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tmpl-004",
+                      "name": "appointment_reminder",
+                      "category": "UTILITY",
+                      "languages": [
+                        {
+                          "language": "en",
+                          "status": "APPROVED",
+                          "code": "Reminder: Your appointment with {{1}} is scheduled for {{2}} at {{3}}.",
+                          "variables": [
+                            "agent_name",
+                            "date",
+                            "time"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tmpl-005",
+                      "name": "shipping_update",
+                      "category": "UTILITY",
+                      "languages": [
+                        {
+                          "language": "en",
+                          "status": "APPROVED",
+                          "code": "Your order {{1}} has been shipped! Track: {{2}}",
+                          "variables": [
+                            "order_id",
+                            "tracking_url"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tmpl-006",
+                      "name": "feedback_request",
+                      "category": "MARKETING",
+                      "languages": [
+                        {
+                          "language": "en",
+                          "status": "APPROVED",
+                          "code": "Hi {{1}}, how was your experience with us? Rate 1-5: ",
+                          "variables": [
+                            "customer_name"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tmpl-007",
+                      "name": "support_ticket_update",
+                      "category": "UTILITY",
+                      "languages": [
+                        {
+                          "language": "en",
+                          "status": "APPROVED",
+                          "code": "Ticket #{{1}} update: {{2}}. Agent: {{3}}",
+                          "variables": [
+                            "ticket_id",
+                            "status",
+                            "agent_name"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "id": "tmpl-008",
+                      "name": "promotional_offer",
+                      "category": "MARKETING",
+                      "languages": [
+                        {
+                          "language": "en",
+                          "status": "APPROVED",
+                          "code": "🎉 Exclusive for you, {{1}}! Get {{2}}% off on your next purchase. Use code: {{3}}",
+                          "variables": [
+                            "customer_name",
+                            "discount",
+                            "code"
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/whatsapp/client-panel-template/": {
+      "post": {
+        "summary": "Create Template",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "integrated_number": {
+                    "type": "string"
+                  },
+                  "template_name": {
+                    "type": "string"
+                  },
+                  "language": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "components": {
+                    "type": "array",
+                    "items": {}
+                  }
+                },
+                "required": [
+                  "integrated_number",
+                  "template_name",
+                  "language",
+                  "category",
+                  "components"
+                ]
+              },
+              "example": {
+                "integrated_number": "{{integratedNumber}}",
+                "template_name": "new_template",
+                "language": "en",
+                "category": "MARKETING",
+                "components": []
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "template_id": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "template_id",
+                    "message"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "template_id": "mock-tmpl-new-k1l2m3",
+                  "message": "Template created, pending WhatsApp approval"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/user/balance/": {
+      "get": {
+        "summary": "Get Balance",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "balance": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "plan": {
+                      "type": "string"
+                    },
+                    "usage": {
+                      "type": "object",
+                      "properties": {
+                        "whatsapp": {
+                          "type": "integer"
+                        },
+                        "sms": {
+                          "type": "integer"
+                        },
+                        "voice": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "whatsapp",
+                        "sms",
+                        "voice"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "balance",
+                    "currency",
+                    "plan",
+                    "usage"
+                  ]
+                },
+                "example": {
+                  "balance": 15000,
+                  "currency": "INR",
+                  "plan": "Business Pro",
+                  "usage": {
+                    "whatsapp": 2340,
+                    "sms": 1250,
+                    "voice": 48
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/whatsapp/integrated-number/call-settings/": {
+      "post": {
+        "summary": "Voice Call Settings",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "integrated_number": {
+                    "type": "string"
+                  },
+                  "voice_enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "integrated_number",
+                  "voice_enabled"
+                ]
+              },
+              "example": {
+                "integrated_number": "{{integratedNumber}}",
+                "voice_enabled": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "voice_enabled": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "voice_enabled",
+                    "message"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "voice_enabled": true,
+                  "message": "Voice calling settings updated"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/whatsapp/sendTemplate": {
+      "post": {
+        "summary": "WhatsApp Send Template (Adapter)",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "integrated_number": {
+                    "type": "string"
+                  },
+                  "content_type": {
+                    "type": "string"
+                  },
+                  "recipient": {
+                    "type": "string"
+                  },
+                  "template": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "components": {
+                        "type": "array",
+                        "items": {}
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "components"
+                    ]
+                  }
+                },
+                "required": [
+                  "integrated_number",
+                  "content_type",
+                  "recipient",
+                  "template"
+                ]
+              },
+              "example": {
+                "integrated_number": "{{integratedNumber}}",
+                "content_type": "template",
+                "recipient": "{{recipientNumber}}",
+                "template": {
+                  "id": "tmpl-001",
+                  "components": []
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "messageId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "messageId",
+                    "message"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "messageId": "mock-adapter-tmpl-001",
+                  "message": "Template sent successfully"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/whatsapp/sendMessage": {
+      "post": {
+        "summary": "WhatsApp Send Message (Adapter)",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "integrated_number": {
+                    "type": "string"
+                  },
+                  "content_type": {
+                    "type": "string"
+                  },
+                  "recipient": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": "object",
+                    "properties": {
+                      "body": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "body"
+                    ]
+                  }
+                },
+                "required": [
+                  "integrated_number",
+                  "content_type",
+                  "recipient",
+                  "text"
+                ]
+              },
+              "example": {
+                "integrated_number": "{{integratedNumber}}",
+                "content_type": "text",
+                "recipient": "{{recipientNumber}}",
+                "text": {
+                  "body": "Hello from adapter"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "messageId": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "messageId",
+                    "message"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "messageId": "mock-adapter-msg-001",
+                  "message": "Message sent successfully"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/whatsapp/getPhoneNumbers": {
+      "get": {
+        "summary": "Get Phone Numbers (Adapter)",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "phone_number": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "phone_number",
+                          "display_name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "data": [
+                    {
+                      "phone_number": "+919876500001",
+                      "display_name": "Nexora Technologies"
+                    },
+                    {
+                      "phone_number": "+919876500002",
+                      "display_name": "Nexora Support"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/flow/": {
+      "post": {
+        "summary": "Send SMS Flow",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "flow_id": {
+                    "type": "string"
+                  },
+                  "recipients": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "mobiles": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "flow_id",
+                  "recipients"
+                ]
+              },
+              "example": {
+                "flow_id": "mock-flow-001",
+                "recipients": [
+                  {
+                    "mobiles": "919876543201",
+                    "name": "Priya"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "request_id",
+                    "message"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "request_id": "mock-sms-flow-n1o2p3",
+                  "message": "SMS sent successfully"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/otp/send": {
+      "post": {
+        "summary": "Send OTP",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mobile": {
+                    "type": "string"
+                  },
+                  "template_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "mobile",
+                  "template_id"
+                ]
+              },
+              "example": {
+                "mobile": "919876543201",
+                "template_id": "mock-otp-tmpl"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "request_id",
+                    "message"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "request_id": "mock-otp-q4r5s6",
+                  "message": "OTP sent successfully"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v5/otp/verify": {
+      "post": {
+        "summary": "Verify OTP",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authkey",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "mobile": {
+                    "type": "string"
+                  },
+                  "otp": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "mobile",
+                  "otp"
+                ]
+              },
+              "example": {
+                "mobile": "919876543201",
+                "otp": "123456"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "message"
+                  ]
+                },
+                "example": {
+                  "type": "success",
+                  "message": "OTP verified successfully"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/dev/bulkV2": {
+      "get": {
+        "summary": "Send OTP (Fast2SMS)",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "query",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "route",
+            "in": "query",
+            "description": "",
+            "required": true,
+            "example": "otp",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "variables_values",
+            "in": "query",
+            "description": "",
+            "required": true,
+            "example": "847291",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "numbers",
+            "in": "query",
+            "description": "",
+            "required": true,
+            "example": "9876543201",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "return": {
+                      "type": "boolean"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "otp": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "return",
+                    "request_id",
+                    "message",
+                    "otp"
+                  ]
+                },
+                "example": {
+                  "return": true,
+                  "request_id": "mock-f2s-otp-w1x2y3",
+                  "message": [
+                    "OTP sent successfully"
+                  ],
+                  "otp": "847291"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/dev/wallet": {
+      "post": {
+        "summary": "Get Wallet Balance",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "return": {
+                      "type": "boolean"
+                    },
+                    "wallet": {
+                      "type": "integer"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "return",
+                    "wallet",
+                    "message"
+                  ]
+                },
+                "example": {
+                  "return": true,
+                  "wallet": 12500,
+                  "message": "Balance fetched successfully"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/dev/delivery": {
+      "get": {
+        "summary": "Get Delivery Status",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "query",
+            "description": "",
+            "required": true,
+            "example": "mock-f2s-t7u8v9",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "{{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "return": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "number": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "delivered_at": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "return",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "return": true,
+                  "data": [
+                    {
+                      "number": "9876543201",
+                      "status": "DELIVERED",
+                      "delivered_at": "2026-02-21T10:30:45.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v2/calls": {
+      "post": {
+        "summary": "Initiate Call",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "string"
+                  },
+                  "caller_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to",
+                  "caller_id"
+                ]
+              },
+              "example": {
+                "from": "+919876500001",
+                "to": "+919876543201",
+                "caller_id": "Nexora CRM"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "call_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "call_id",
+                    "status",
+                    "from",
+                    "to",
+                    "created_at"
+                  ]
+                },
+                "example": {
+                  "success": true,
+                  "call_id": "mock-call-z1a2b3c4",
+                  "status": "initiated",
+                  "from": "+919876500001",
+                  "to": "+919876543201",
+                  "created_at": "2026-02-21T10:00:00.000Z"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v2/calls/mock-call-z1a2b3c4": {
+      "get": {
+        "summary": "Get Call Detail",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "call_id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    },
+                    "duration": {
+                      "type": "integer"
+                    },
+                    "start_time": {
+                      "type": "string"
+                    },
+                    "end_time": {
+                      "type": "string"
+                    },
+                    "direction": {
+                      "type": "string"
+                    },
+                    "recording_url": {
+                      "type": "string"
+                    },
+                    "transcript": {
+                      "type": "string"
+                    },
+                    "ai_summary": {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "sentiment": {
+                          "type": "string"
+                        },
+                        "action_items": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "topics": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "sentiment",
+                        "action_items",
+                        "topics"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "call_id",
+                    "status",
+                    "from",
+                    "to",
+                    "duration",
+                    "start_time",
+                    "end_time",
+                    "direction",
+                    "recording_url",
+                    "transcript",
+                    "ai_summary"
+                  ]
+                },
+                "example": {
+                  "success": true,
+                  "call_id": "mock-call-z1a2b3c4",
+                  "status": "completed",
+                  "from": "+919876500001",
+                  "to": "+919876543201",
+                  "duration": 245,
+                  "start_time": "2026-02-21T10:00:05.000Z",
+                  "end_time": "2026-02-21T10:04:10.000Z",
+                  "direction": "outbound",
+                  "recording_url": "https://mock.pstmn.io/recordings/call-z1a2b3c4.mp3",
+                  "transcript": "Customer interested in Pro plan. Discussed custom pricing for 25 users. Follow-up scheduled for Thursday.",
+                  "ai_summary": {
+                    "summary": "Customer Priya Sharma expressed interest in the Pro plan for her team of 25. Discussed volume pricing and enterprise features. Customer will make a decision by Thursday after internal review.",
+                    "sentiment": "positive",
+                    "action_items": [
+                      "Send Pro plan pricing sheet for 25 users",
+                      "Schedule follow-up call for Thursday 2PM",
+                      "Prepare custom proposal with enterprise features"
+                    ],
+                    "topics": [
+                      "pricing",
+                      "enterprise features",
+                      "team onboarding"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/v2/calls/mock-call-z1a2b3c4/recording": {
+      "get": {
+        "summary": "Get Call Recording",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "duration": {
+                      "type": "integer"
+                    },
+                    "format": {
+                      "type": "string"
+                    },
+                    "size_bytes": {
+                      "type": "integer"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "duration",
+                    "format",
+                    "size_bytes",
+                    "created_at"
+                  ]
+                },
+                "example": {
+                  "url": "https://mock.pstmn.io/recordings/call-z1a2b3c4.mp3",
+                  "duration": 245,
+                  "format": "mp3",
+                  "size_bytes": 2940000,
+                  "created_at": "2026-02-21T10:04:15.000Z"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/emails": {
+      "post": {
+        "summary": "Send Email",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "to": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "html": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "to",
+                  "subject",
+                  "html"
+                ]
+              },
+              "example": {
+                "from": "Nexora <noreply@nexoraos.pro>",
+                "to": [
+                  "priya.sharma@techcorp.in"
+                ],
+                "subject": "Your Nexora Pro Trial is Ready!",
+                "html": "<h1>Welcome to Nexora Pro!</h1><p>Your 14-day trial has started.</p>"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "created_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "from",
+                    "to",
+                    "created_at"
+                  ]
+                },
+                "example": {
+                  "id": "mock-email-d4e5f6g7",
+                  "status": "sent",
+                  "from": "Nexora <noreply@nexoraos.pro>",
+                  "to": [
+                    "priya.sharma@techcorp.in"
+                  ],
+                  "created_at": "2026-02-21T10:15:00.000Z"
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/emails/batch": {
+      "post": {
+        "summary": "Send Batch Emails",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "html": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "to",
+                    "subject",
+                    "html"
+                  ]
+                }
+              },
+              "example": [
+                {
+                  "from": "Nexora <noreply@nexoraos.pro>",
+                  "to": "priya@techcorp.in",
+                  "subject": "Weekly Report",
+                  "html": "<p>Your weekly CRM report is ready.</p>"
+                },
+                {
+                  "from": "Nexora <noreply@nexoraos.pro>",
+                  "to": "rajesh@startup.co",
+                  "subject": "Weekly Report",
+                  "html": "<p>Your weekly CRM report is ready.</p>"
+                }
+              ]
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "mock-email-batch-001"
+                    },
+                    {
+                      "id": "mock-email-batch-002"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/emails/mock-email-d4e5f6g7": {
+      "get": {
+        "summary": "Get Email Status",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "from": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "last_event": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "opens": {
+                      "type": "integer"
+                    },
+                    "clicks": {
+                      "type": "integer"
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "timestamp": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "timestamp"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "from",
+                    "to",
+                    "subject",
+                    "last_event",
+                    "created_at",
+                    "opens",
+                    "clicks",
+                    "events"
+                  ]
+                },
+                "example": {
+                  "id": "mock-email-d4e5f6g7",
+                  "from": "Nexora <noreply@nexoraos.pro>",
+                  "to": [
+                    "priya.sharma@techcorp.in"
+                  ],
+                  "subject": "Your Nexora Pro Trial is Ready!",
+                  "last_event": "delivered",
+                  "created_at": "2026-02-21T10:15:00.000Z",
+                  "opens": 2,
+                  "clicks": 1,
+                  "events": [
+                    {
+                      "type": "sent",
+                      "timestamp": "2026-02-21T10:15:01.000Z"
+                    },
+                    {
+                      "type": "delivered",
+                      "timestamp": "2026-02-21T10:15:03.000Z"
+                    },
+                    {
+                      "type": "opened",
+                      "timestamp": "2026-02-21T10:22:15.000Z"
+                    },
+                    {
+                      "type": "clicked",
+                      "timestamp": "2026-02-21T10:22:45.000Z"
+                    },
+                    {
+                      "type": "opened",
+                      "timestamp": "2026-02-21T14:05:30.000Z"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/domains": {
+      "get": {
+        "summary": "List Domains",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "region": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "records": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                },
+                                "status": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "name",
+                                "value",
+                                "status"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                },
+                "example": {
+                  "data": [
+                    {
+                      "id": "mock-domain-001",
+                      "name": "nexoraos.pro",
+                      "status": "verified",
+                      "region": "ap-south-1",
+                      "created_at": "2025-12-01T00:00:00.000Z",
+                      "records": [
+                        {
+                          "type": "MX",
+                          "name": "nexoraos.pro",
+                          "value": "feedback-smtp.mock.pstmn.io",
+                          "status": "verified"
+                        },
+                        {
+                          "type": "TXT",
+                          "name": "nexoraos.pro",
+                          "value": "v=spf1 include:mock.pstmn.io ~all",
+                          "status": "verified"
+                        },
+                        {
+                          "type": "CNAME",
+                          "name": "resend._domainkey.nexoraos.pro",
+                          "value": "mock-dkim.pstmn.io",
+                          "status": "verified"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/ai/summarize": {
+      "post": {
+        "summary": "Summarize Conversation",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "text"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "messages"
+                ]
+              },
+              "example": {
+                "conversation_id": "conv-001",
+                "messages": [
+                  {
+                    "role": "customer",
+                    "text": "Hi, I need help with my order"
+                  },
+                  {
+                    "role": "agent",
+                    "text": "Sure! What's your order number?"
+                  },
+                  {
+                    "role": "customer",
+                    "text": "ORD-2024-5678. It hasn't arrived yet."
+                  },
+                  {
+                    "role": "agent",
+                    "text": "Let me check. I see it's in transit, expected by tomorrow."
+                  },
+                  {
+                    "role": "customer",
+                    "text": "Thanks, that's helpful!"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "bullets": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "sentiment": {
+                          "type": "string"
+                        },
+                        "resolution_status": {
+                          "type": "string"
+                        },
+                        "key_topics": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "customer_satisfaction": {
+                          "type": "number"
+                        },
+                        "urgency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "bullets",
+                        "sentiment",
+                        "resolution_status",
+                        "key_topics",
+                        "customer_satisfaction",
+                        "urgency"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "summary"
+                  ]
+                },
+                "example": {
+                  "summary": {
+                    "bullets": [
+                      "Customer inquired about delayed order ORD-2024-5678",
+                      "Agent confirmed order is in transit, delivery expected tomorrow",
+                      "Customer was satisfied with the update"
+                    ],
+                    "sentiment": "positive",
+                    "resolution_status": "resolved",
+                    "key_topics": [
+                      "order status",
+                      "delivery",
+                      "tracking"
+                    ],
+                    "customer_satisfaction": 4.2,
+                    "urgency": "low"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/ai/suggest-reply": {
+      "post": {
+        "summary": "Suggest Reply",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "last_message": {
+                    "type": "string"
+                  },
+                  "context": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "last_message",
+                  "context"
+                ]
+              },
+              "example": {
+                "conversation_id": "conv-002",
+                "last_message": "What plans do you offer for a team of 15 people?",
+                "context": "sales_inquiry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "suggestions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "text": {
+                            "type": "string"
+                          },
+                          "tone": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "text",
+                          "tone",
+                          "confidence"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "suggestions"
+                  ]
+                },
+                "example": {
+                  "suggestions": [
+                    {
+                      "text": "Great question! For a team of 15, our Pro plan at ₹999/user/month would be perfect. It includes unlimited contacts, WhatsApp integration, and advanced analytics. Shall I share the detailed pricing?",
+                      "tone": "professional",
+                      "confidence": 0.92
+                    },
+                    {
+                      "text": "Hi! We have a Business plan starting at ₹799/user/month and a Pro plan at ₹999/user/month. For 15 users, I'd recommend Pro — it includes everything your team needs. Want me to set up a demo?",
+                      "tone": "friendly",
+                      "confidence": 0.88
+                    },
+                    {
+                      "text": "We offer competitive team pricing! For 15 users on our Pro plan, we can offer a 10% volume discount bringing it to ₹899/user/month. This includes full CRM, marketing automation, and priority support.",
+                      "tone": "sales",
+                      "confidence": 0.85
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/ai/sentiment": {
+      "post": {
+        "summary": "Analyze Sentiment",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "context": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text",
+                  "context"
+                ]
+              },
+              "example": {
+                "text": "I've been trying to reach support for 3 days now. The product is good but this service is frustrating.",
+                "context": "support_ticket"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sentiment": {
+                      "type": "string"
+                    },
+                    "score": {
+                      "type": "number"
+                    },
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "emotions": {
+                      "type": "object",
+                      "properties": {
+                        "frustration": {
+                          "type": "number"
+                        },
+                        "satisfaction": {
+                          "type": "number"
+                        },
+                        "urgency": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "frustration",
+                        "satisfaction",
+                        "urgency"
+                      ]
+                    },
+                    "keywords": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "recommendation": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "sentiment",
+                    "score",
+                    "confidence",
+                    "emotions",
+                    "keywords",
+                    "recommendation"
+                  ]
+                },
+                "example": {
+                  "sentiment": "negative",
+                  "score": -0.45,
+                  "confidence": 0.89,
+                  "emotions": {
+                    "frustration": 0.78,
+                    "satisfaction": 0.22,
+                    "urgency": 0.65
+                  },
+                  "keywords": [
+                    "support",
+                    "frustrating",
+                    "3 days",
+                    "trying to reach"
+                  ],
+                  "recommendation": "Prioritize this customer — they appreciate the product but are frustrated with response time. A quick, empathetic response can recover this relationship."
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/ai/classify-intent": {
+      "post": {
+        "summary": "Classify Intent",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "Bearer {{authKey}}",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Content-Type",
+            "in": "header",
+            "description": "",
+            "required": true,
+            "example": "application/json",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "context": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "text",
+                  "context"
+                ]
+              },
+              "example": {
+                "text": "I'd like to know the pricing for the enterprise plan and if you offer GST invoicing",
+                "context": "inbound_message"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "intent": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "sub_intents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "intent": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "intent",
+                          "confidence"
+                        ]
+                      }
+                    },
+                    "entities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "value",
+                          "confidence"
+                        ]
+                      }
+                    },
+                    "suggested_actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "action": {
+                            "type": "string"
+                          },
+                          "priority": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "action",
+                          "priority"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "intent",
+                    "confidence",
+                    "category",
+                    "sub_intents",
+                    "entities",
+                    "suggested_actions"
+                  ]
+                },
+                "example": {
+                  "intent": "purchase_inquiry",
+                  "confidence": 0.91,
+                  "category": "SALES",
+                  "sub_intents": [
+                    {
+                      "intent": "pricing_request",
+                      "confidence": 0.94
+                    },
+                    {
+                      "intent": "feature_inquiry",
+                      "confidence": 0.87
+                    }
+                  ],
+                  "entities": [
+                    {
+                      "type": "plan",
+                      "value": "enterprise",
+                      "confidence": 0.96
+                    },
+                    {
+                      "type": "feature",
+                      "value": "GST invoicing",
+                      "confidence": 0.93
+                    }
+                  ],
+                  "suggested_actions": [
+                    {
+                      "action": "route_to_sales",
+                      "priority": "high"
+                    },
+                    {
+                      "action": "send_pricing_sheet",
+                      "priority": "medium"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "schemas": {},
+    "responses": {},
+    "securitySchemes": {}
+  },
+  "servers": [],
+  "security": []
+}

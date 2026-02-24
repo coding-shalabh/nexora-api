@@ -7,9 +7,34 @@
 import { prisma } from '@crm360/database';
 import { logger } from '../common/logger.js';
 
+// Default Fast2SMS URLs (overridable per-account via providerConfig)
 const FAST2SMS_BASE_URL = 'https://www.fast2sms.com/dev/bulkV2';
 const FAST2SMS_OTP_URL = 'https://www.fast2sms.com/dev/otp';
 const FAST2SMS_BALANCE_URL = 'https://www.fast2sms.com/dev/wallet';
+
+/**
+ * Resolve SMS URL — API Dog provider routes via account's configured base URL
+ * @param {string} defaultUrl - Default Fast2SMS URL
+ * @param {object} providerConfig - { baseUrl, apiToken } from ChannelAccount.providerConfig
+ */
+function resolveSmsUrl(defaultUrl, providerConfig) {
+  if (providerConfig?.baseUrl) {
+    const path = new URL(defaultUrl).pathname;
+    return providerConfig.baseUrl + path;
+  }
+  return defaultUrl;
+}
+
+/**
+ * Build fetch options with provider-aware headers
+ */
+function smsFetchOptions(method, providerConfig) {
+  const options = { method };
+  if (providerConfig?.apiToken) {
+    options.headers = { apidogToken: providerConfig.apiToken };
+  }
+  return options;
+}
 
 // Default API key from environment or provided key
 const DEFAULT_API_KEY =
@@ -29,6 +54,7 @@ export async function sendQuickSMS(options) {
     language = 'english',
     flash = 0,
     apiKey = DEFAULT_API_KEY,
+    providerConfig,
   } = options;
 
   try {
@@ -49,9 +75,8 @@ export async function sendQuickSMS(options) {
       params.append('sender_id', senderId);
     }
 
-    const response = await fetch(`${FAST2SMS_BASE_URL}?${params.toString()}`, {
-      method: 'GET',
-    });
+    const url = resolveSmsUrl(FAST2SMS_BASE_URL, providerConfig);
+    const response = await fetch(`${url}?${params.toString()}`, smsFetchOptions('GET', providerConfig));
 
     const data = await response.json();
 
@@ -98,6 +123,7 @@ export async function sendOTP(options) {
     otp, // If not provided, Fast2SMS generates one
     expiry = 5, // minutes
     apiKey = DEFAULT_API_KEY,
+    providerConfig,
   } = options;
 
   try {
@@ -110,9 +136,8 @@ export async function sendOTP(options) {
       numbers: formattedPhone,
     });
 
-    const response = await fetch(`${FAST2SMS_BASE_URL}?${params.toString()}`, {
-      method: 'GET',
-    });
+    const url = resolveSmsUrl(FAST2SMS_BASE_URL, providerConfig);
+    const response = await fetch(`${url}?${params.toString()}`, smsFetchOptions('GET', providerConfig));
 
     const data = await response.json();
 
@@ -152,7 +177,7 @@ export async function sendOTP(options) {
  * Required for commercial SMS in India
  */
 export async function sendDLTTemplateSMS(options) {
-  const { phone, templateId, variables = [], senderId, apiKey = DEFAULT_API_KEY } = options;
+  const { phone, templateId, variables = [], senderId, apiKey = DEFAULT_API_KEY, providerConfig } = options;
 
   try {
     const formattedPhone = formatPhoneNumber(phone);
@@ -166,9 +191,8 @@ export async function sendDLTTemplateSMS(options) {
       numbers: formattedPhone,
     });
 
-    const response = await fetch(`${FAST2SMS_BASE_URL}?${params.toString()}`, {
-      method: 'GET',
-    });
+    const url = resolveSmsUrl(FAST2SMS_BASE_URL, providerConfig);
+    const response = await fetch(`${url}?${params.toString()}`, smsFetchOptions('GET', providerConfig));
 
     const data = await response.json();
 
@@ -213,6 +237,7 @@ export async function sendBulkSMS(options) {
     senderId = 'FSTSMS',
     route = 'q',
     apiKey = DEFAULT_API_KEY,
+    providerConfig,
   } = options;
 
   try {
@@ -230,9 +255,8 @@ export async function sendBulkSMS(options) {
       params.append('sender_id', senderId);
     }
 
-    const response = await fetch(`${FAST2SMS_BASE_URL}?${params.toString()}`, {
-      method: 'GET',
-    });
+    const url = resolveSmsUrl(FAST2SMS_BASE_URL, providerConfig);
+    const response = await fetch(`${url}?${params.toString()}`, smsFetchOptions('GET', providerConfig));
 
     const data = await response.json();
 
@@ -266,16 +290,13 @@ export async function sendBulkSMS(options) {
 /**
  * Get wallet balance
  */
-export async function getBalance(apiKey = DEFAULT_API_KEY) {
+export async function getBalance(apiKey = DEFAULT_API_KEY, providerConfig = null) {
   try {
-    // Fast2SMS wallet endpoint requires POST method with authorization header
-    const response = await fetch(FAST2SMS_BALANCE_URL, {
-      method: 'POST',
-      headers: {
-        authorization: apiKey,
-        'Content-Type': 'application/json',
-      },
-    });
+    const url = resolveSmsUrl(FAST2SMS_BALANCE_URL, providerConfig);
+    const headers = { authorization: apiKey, 'Content-Type': 'application/json' };
+    if (providerConfig?.apiToken) headers.apidogToken = providerConfig.apiToken;
+
+    const response = await fetch(url, { method: 'POST', headers });
 
     const data = await response.json();
 

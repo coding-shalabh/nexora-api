@@ -6,8 +6,28 @@
 import { Server } from 'socket.io';
 import { logger } from '../logger.js';
 import { verifyToken } from '../utils/jwt.js';
+import { prisma } from '@crm360/database';
 
 let io = null;
+
+/**
+ * Per-socket event rate limiter.
+ * Tracks event counts per socket per sliding window.
+ */
+function createSocketRateLimiter(maxEvents = 30, windowMs = 10000) {
+  const counters = new WeakMap();
+
+  return function checkRate(socket) {
+    const now = Date.now();
+    let entry = counters.get(socket);
+    if (!entry || now - entry.windowStart > windowMs) {
+      entry = { windowStart: now, count: 0 };
+      counters.set(socket, entry);
+    }
+    entry.count++;
+    return entry.count > maxEvents;
+  };
+}
 
 /**
  * Initialize Socket.io server
@@ -16,7 +36,7 @@ let io = null;
 export function initializeSocketIO(httpServer) {
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+      origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -51,13 +71,28 @@ export function initializeSocketIO(httpServer) {
     }
   });
 
+  // Per-socket rate limiter: max 30 events per 10s
+  const isRateLimited = createSocketRateLimiter(30, 10000);
+
   // Connection handler
   io.on('connection', (socket) => {
-    logger.info({
-      socketId: socket.id,
-      userId: socket.userId,
-      tenantId: socket.tenantId,
-    }, 'Client connected to WebSocket');
+    logger.info(
+      {
+        socketId: socket.id,
+        userId: socket.userId,
+        tenantId: socket.tenantId,
+      },
+      'Client connected to WebSocket'
+    );
+
+    // Rate-limit middleware for all incoming events
+    socket.use(([event, ...args], next) => {
+      if (isRateLimited(socket)) {
+        logger.warn({ socketId: socket.id, event }, 'Socket event rate limited');
+        return next(new Error('Rate limit exceeded'));
+      }
+      next();
+    });
 
     // Join tenant room for receiving tenant-wide broadcasts
     socket.join(`tenant:${socket.tenantId}`);
@@ -65,22 +100,41 @@ export function initializeSocketIO(httpServer) {
     // Join user room for user-specific messages
     socket.join(`user:${socket.userId}`);
 
-    // Handle joining specific conversation room
-    socket.on('join:conversation', (conversationId) => {
-      socket.join(`conversation:${conversationId}`);
-      logger.debug({
-        socketId: socket.id,
-        conversationId,
-      }, 'Client joined conversation room');
+    // Handle joining specific conversation room (with tenant verification)
+    socket.on('join:conversation', async (conversationId) => {
+      try {
+        // Verify the conversation belongs to this user's tenant
+        const conversation = await prisma.conversation.findFirst({
+          where: { id: conversationId, tenantId: socket.tenantId },
+          select: { id: true },
+        });
+        if (!conversation) {
+          socket.emit('error', { message: 'Conversation not found' });
+          return;
+        }
+        socket.join(`conversation:${conversationId}`);
+        logger.debug(
+          {
+            socketId: socket.id,
+            conversationId,
+          },
+          'Client joined conversation room'
+        );
+      } catch (err) {
+        logger.error({ err, conversationId }, 'Failed to join conversation room');
+      }
     });
 
     // Handle leaving conversation room
     socket.on('leave:conversation', (conversationId) => {
       socket.leave(`conversation:${conversationId}`);
-      logger.debug({
-        socketId: socket.id,
-        conversationId,
-      }, 'Client left conversation room');
+      logger.debug(
+        {
+          socketId: socket.id,
+          conversationId,
+        },
+        'Client left conversation room'
+      );
     });
 
     // Handle typing indicators
@@ -102,19 +156,25 @@ export function initializeSocketIO(httpServer) {
 
     // Handle disconnection
     socket.on('disconnect', (reason) => {
-      logger.info({
-        socketId: socket.id,
-        userId: socket.userId,
-        reason,
-      }, 'Client disconnected from WebSocket');
+      logger.info(
+        {
+          socketId: socket.id,
+          userId: socket.userId,
+          reason,
+        },
+        'Client disconnected from WebSocket'
+      );
     });
 
     // Handle errors
     socket.on('error', (error) => {
-      logger.error({
-        socketId: socket.id,
-        error: error.message,
-      }, 'Socket error');
+      logger.error(
+        {
+          socketId: socket.id,
+          error: error.message,
+        },
+        'Socket error'
+      );
     });
   });
 
@@ -164,12 +224,15 @@ export function broadcastNewMessage(message) {
 
   const { tenantId, threadId, ...messageData } = message;
 
-  logger.info({
-    conversationId: threadId,
-    messageId: message.id,
-    content: messageData.content,
-    direction: messageData.direction,
-  }, 'Broadcasting new message via WebSocket');
+  logger.info(
+    {
+      conversationId: threadId,
+      messageId: message.id,
+      content: messageData.content,
+      direction: messageData.direction,
+    },
+    'Broadcasting new message via WebSocket'
+  );
 
   // Emit to conversation room (users viewing this conversation)
   io.to(`conversation:${threadId}`).emit('message:new', {
@@ -187,7 +250,13 @@ export function broadcastNewMessage(message) {
 /**
  * Broadcast message status update
  */
-export function broadcastMessageStatus(tenantId, messageId, conversationId, status, failureReason = null) {
+export function broadcastMessageStatus(
+  tenantId,
+  messageId,
+  conversationId,
+  status,
+  failureReason = null
+) {
   if (!io) return;
 
   const payload = {
@@ -200,12 +269,15 @@ export function broadcastMessageStatus(tenantId, messageId, conversationId, stat
   // Emit to conversation room (users viewing this conversation)
   io.to(`conversation:${conversationId}`).emit('message:status', payload);
 
-  logger.debug({
-    messageId,
-    conversationId,
-    status,
-    failureReason,
-  }, 'Message status broadcast via WebSocket');
+  logger.debug(
+    {
+      messageId,
+      conversationId,
+      status,
+      failureReason,
+    },
+    'Message status broadcast via WebSocket'
+  );
 }
 
 /**

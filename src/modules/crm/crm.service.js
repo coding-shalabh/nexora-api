@@ -126,6 +126,17 @@ class CrmService {
   }
 
   async createContact(tenantId, userId, data) {
+    // Check for duplicate email within the same tenant
+    if (data.email) {
+      const existing = await prisma.contact.findFirst({
+        where: { tenantId, email: data.email },
+        select: { id: true },
+      });
+      if (existing) {
+        throw new Error('A contact with this email already exists.');
+      }
+    }
+
     // If tags are provided, first ensure they exist in the Tag table
     let tagConnections = [];
     if (data.tags && data.tags.length > 0) {
@@ -297,9 +308,27 @@ class CrmService {
       throw new NotFoundError('Contact');
     }
 
-    await prisma.contact.delete({
-      where: { id: contactId },
-    });
+    // Nullify contactId in related tables before deleting (FK has no cascade, fields are nullable)
+    await prisma.$transaction([
+      prisma.contactTag.deleteMany({ where: { contactId } }),
+      prisma.activity.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.deal.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.ticket.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.conversationThread.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.conversation.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.callSession.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.invoice.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.quote.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.formSubmission.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.visitorSession.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.pageView.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.visitorEvent.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.linkClick.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.surveyResponse.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.bookingSlot.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.documentSigner.updateMany({ where: { contactId }, data: { contactId: null } }),
+      prisma.contact.delete({ where: { id: contactId } }),
+    ]);
 
     eventBus.publish(createEvent(EventTypes.CONTACT_DELETED, tenantId, { contactId }));
   }

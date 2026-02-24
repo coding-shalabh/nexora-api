@@ -127,7 +127,7 @@ class ChannelsService {
 
     // Check for duplicate identifier
     const existing = await prisma.channelAccount.findFirst({
-      where: { tenantId, channelType, identifier },
+      where: { tenantId, type: channelType, identifier },
     });
 
     if (existing) {
@@ -139,7 +139,7 @@ class ChannelsService {
         tenantId,
         workspaceId,
         name,
-        channelType,
+        type: channelType,
         identifier,
         credentials,
         dltEntityId,
@@ -403,7 +403,7 @@ class ChannelsService {
       throw new NotFoundError('Channel account not found');
     }
 
-    return rateLimiter.getStatus(channelAccountId, account.channelType);
+    return rateLimiter.getStatus(channelAccountId, account.type);
   }
 
   // =====================
@@ -682,7 +682,7 @@ class ChannelsService {
       where: { id: channelAccountId },
     });
 
-    if (!account || account.channelType !== 'EMAIL') {
+    if (!account || account.type !== 'EMAIL') {
       throw new NotFoundError('Email channel not found');
     }
 

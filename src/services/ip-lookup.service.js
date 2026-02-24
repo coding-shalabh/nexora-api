@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const IPAPI_KEY = process.env.IPAPI_KEY || 'a40190664a200f86c6a6';
+const IPAPI_KEY = process.env.IPAPI_KEY || '';
 const IPAPI_BASE_URL = 'https://api.ipapi.is';
 
 /**
@@ -95,8 +95,12 @@ class IpLookupService {
     const lookup = await this.lookup(ip);
 
     // Skip if it's a VPN, proxy, or hosting provider
-    if (lookup.connection.isVpn || lookup.connection.isProxy ||
-        lookup.connection.isTor || lookup.connection.isHosting) {
+    if (
+      lookup.connection.isVpn ||
+      lookup.connection.isProxy ||
+      lookup.connection.isTor ||
+      lookup.connection.isHosting
+    ) {
       return {
         identified: false,
         reason: 'VPN/Proxy/Hosting detected',
@@ -131,9 +135,7 @@ class IpLookupService {
    * @returns {Promise<Object[]>} Array of lookup results
    */
   async batchLookup(ips) {
-    const results = await Promise.allSettled(
-      ips.map(ip => this.lookup(ip))
-    );
+    const results = await Promise.allSettled(ips.map((ip) => this.lookup(ip)));
 
     return results.map((result, index) => ({
       ip: ips[index],

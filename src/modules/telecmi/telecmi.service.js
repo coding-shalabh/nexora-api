@@ -4,15 +4,15 @@
  * Documentation: https://doc.telecmi.com/chub/docs/get-started/
  */
 
+import { logger } from '../../common/logger.js';
+
 const TELECMI_BASE_URL = 'https://rest.telecmi.com/v2';
-const TELECMI_APP_ID = 33337109; // Must be a number
-const TELECMI_SECRET = '7f58c15e-e903-41c1-8a66-8867c390b965';
 
 class TeleCMIService {
   constructor() {
     this.baseUrl = TELECMI_BASE_URL;
-    this.appId = TELECMI_APP_ID;
-    this.secret = TELECMI_SECRET;
+    this.appId = parseInt(process.env.TELECMI_APP_ID, 10) || 0;
+    this.secret = process.env.TELECMI_SECRET || '';
   }
 
   /**
@@ -37,21 +37,21 @@ class TeleCMIService {
       options.body = JSON.stringify(body);
     }
 
-    console.log('[TeleCMI] ' + method + ' ' + endpoint, body ? JSON.stringify(body) : '');
+    logger.debug({ method, endpoint }, 'TeleCMI API request');
 
     const response = await fetch(url, options);
     const data = await response.json();
 
     // TeleCMI returns code 200 for success, non-200 for errors
     if (data.code && data.code !== 200) {
-      console.error('[TeleCMI] API Error:', JSON.stringify(data, null, 2));
+      logger.error({ endpoint, code: data.code, msg: data.msg }, 'TeleCMI API error');
       const errorMsg =
         data.msg?.body?.[0]?.message || data.msg || data.status || 'TeleCMI API request failed';
       throw new Error(typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg));
     }
 
     if (!response.ok) {
-      console.error('[TeleCMI] HTTP Error:', data);
+      logger.error({ endpoint, status: response.status }, 'TeleCMI HTTP error');
       throw new Error(data.message || data.error || 'TeleCMI API request failed');
     }
 
@@ -733,7 +733,7 @@ class TeleCMIService {
           nextExtension = maxExtension + 1;
         }
       } catch (e) {
-        console.log('[TeleCMI] Could not get agents, using default extension 100');
+        logger.warn('Could not fetch TeleCMI agents, using default extension 100');
       }
 
       // Create agent in TeleCMI
@@ -764,7 +764,7 @@ class TeleCMIService {
         createdAt: new Date().toISOString(),
       };
 
-      console.log('[TeleCMI] Provisioned agent for user:', userId, 'Extension:', nextExtension);
+      logger.info({ userId, extension: nextExtension }, 'TeleCMI agent provisioned');
 
       return {
         success: true,
@@ -773,7 +773,7 @@ class TeleCMIService {
         extension: nextExtension,
       };
     } catch (error) {
-      console.error('[TeleCMI] Failed to provision agent:', error.message);
+      logger.error({ err: error, userId }, 'Failed to provision TeleCMI agent');
       return {
         success: false,
         error: error.message,

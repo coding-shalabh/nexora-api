@@ -108,22 +108,11 @@ const bulkEnrollSchema = z.object({
  */
 router.get('/stats', async (req, res, next) => {
   try {
-    const tenantId = req.tenantId;
-
-    // TODO: Implement actual stats calculation
-    // For now, return default values
+    const tenantId = req.tenantId || req.auth?.tenantId;
+    const stats = await sequencesService.getSequenceStats(tenantId);
     res.json({
       success: true,
-      data: {
-        totalSequences: 0,
-        activeSequences: 0,
-        totalEnrollments: 0,
-        activeEnrollments: 0,
-        completedEnrollments: 0,
-        exitedEnrollments: 0,
-        totalStepsSent: 0,
-        avgCompletionRate: 0,
-      },
+      data: stats,
     });
   } catch (error) {
     next(error);
@@ -136,20 +125,18 @@ router.get('/stats', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const tenantId = req.tenantId || req.auth?.tenantId;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-
-    // TODO: Implement actual sequence listing from database
-    // For now, return empty array with proper structure
+    const { isActive, targetType, search, page, limit } = req.query;
+    const result = await sequencesService.getSequences(tenantId, {
+      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      targetType,
+      search,
+      page: parseInt(page) || 1,
+      limit: parseInt(limit) || 20,
+    });
     res.json({
       success: true,
-      data: [],
-      meta: {
-        total: 0,
-        page,
-        limit,
-        totalPages: 0,
-      },
+      data: result.sequences,
+      meta: result.pagination,
     });
   } catch (error) {
     next(error);
@@ -176,20 +163,7 @@ router.post('/', validateRequest({ body: createSequenceSchema }), async (req, re
   try {
     const tenantId = req.tenantId || req.auth?.tenantId;
     const userId = req.userId || req.auth?.userId;
-
-    // TODO: Implement actual sequence creation in database
-    // For now, return mock sequence
-    const sequence = {
-      id: 'seq_' + Date.now(),
-      name: req.body.name,
-      description: req.body.description || null,
-      targetType: req.body.targetType || 'CONTACT',
-      isActive: false,
-      createdAt: new Date().toISOString(),
-      createdBy: userId,
-      tenantId,
-    };
-
+    const sequence = await sequencesService.createSequence(tenantId, userId, req.body);
     res.status(201).json({
       success: true,
       data: sequence,

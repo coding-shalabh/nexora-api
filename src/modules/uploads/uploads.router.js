@@ -9,6 +9,12 @@ import { authenticate, authorize } from '../../common/middleware/authenticate.js
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
+import {
+  checkStorageQuota,
+  incrementStorageUsage,
+  decrementStorageUsage,
+  getStorageStats,
+} from '../../common/middleware/storage-quota.js';
 
 const router = Router();
 
@@ -111,16 +117,12 @@ router.get('/files/categories', authenticate, async (req, res, next) => {
  */
 router.get('/files/stats', authenticate, async (req, res, next) => {
   try {
-    // TODO: Implement actual storage stats calculation
-    // For now, return default values
+    const stats = await getStorageStats(req.tenantId);
+
     res.json({
       success: true,
       data: {
-        totalFiles: 0,
-        totalSize: 0,
-        usedSpace: 0,
-        availableSpace: 10737418240, // 10GB in bytes
-        storageLimit: 10737418240,
+        ...stats,
         byCategory: {
           documents: 0,
           images: 0,
@@ -215,6 +217,17 @@ router.post('/image', authenticate, async (req, res, next) => {
       });
     }
 
+    // Check storage quota
+    try {
+      await checkStorageQuota(tenantId, buffer.length);
+    } catch (quotaError) {
+      return res.status(413).json({
+        success: false,
+        error: 'STORAGE_QUOTA_EXCEEDED',
+        message: quotaError.message,
+      });
+    }
+
     // Validate image type
     const allowedTypes = ['jpeg', 'jpg', 'png', 'gif', 'webp', 'svg+xml'];
     const normalizedType = imageType.toLowerCase();
@@ -243,6 +256,9 @@ router.post('/image', authenticate, async (req, res, next) => {
     // Save file
     const filePath = path.join(folderPath, finalFilename);
     fs.writeFileSync(filePath, buffer);
+
+    // Update storage usage
+    await incrementStorageUsage(tenantId, buffer.length);
 
     // Generate URL - use API_URL for uploads since files are stored on API server
     const baseUrl = process.env.API_URL || 'https://api.nexoraos.pro';
@@ -306,6 +322,17 @@ router.post('/logo', authenticate, authorize('settings:update'), async (req, res
       });
     }
 
+    // Check storage quota
+    try {
+      await checkStorageQuota(tenantId, buffer.length);
+    } catch (quotaError) {
+      return res.status(413).json({
+        success: false,
+        error: 'STORAGE_QUOTA_EXCEEDED',
+        message: quotaError.message,
+      });
+    }
+
     // Generate filename - handle svg+xml correctly
     const normalizedType = imageType.toLowerCase();
     const ext = normalizedType.includes('svg') ? 'svg' : normalizedType.replace('jpeg', 'jpg');
@@ -321,6 +348,9 @@ router.post('/logo', authenticate, authorize('settings:update'), async (req, res
     // Save file
     const filePath = path.join(folderPath, finalFilename);
     fs.writeFileSync(filePath, buffer);
+
+    // Update storage usage
+    await incrementStorageUsage(tenantId, buffer.length);
 
     // Generate URL - use API_URL for uploads since files are stored on API server
     const baseUrl = process.env.API_URL || 'https://api.nexoraos.pro';
@@ -382,6 +412,17 @@ router.post('/favicon', authenticate, authorize('settings:update'), async (req, 
       });
     }
 
+    // Check storage quota
+    try {
+      await checkStorageQuota(tenantId, buffer.length);
+    } catch (quotaError) {
+      return res.status(413).json({
+        success: false,
+        error: 'STORAGE_QUOTA_EXCEEDED',
+        message: quotaError.message,
+      });
+    }
+
     // Validate type (ICO or PNG only)
     const normalizedType = imageType.toLowerCase();
     if (!['png', 'x-icon', 'vnd.microsoft.icon'].some((t) => normalizedType.includes(t))) {
@@ -406,6 +447,9 @@ router.post('/favicon', authenticate, authorize('settings:update'), async (req, 
     // Save file
     const filePath = path.join(folderPath, finalFilename);
     fs.writeFileSync(filePath, buffer);
+
+    // Update storage usage
+    await incrementStorageUsage(tenantId, buffer.length);
 
     // Generate URL
     const baseUrl = process.env.API_URL || 'https://api.nexoraos.pro';
@@ -459,11 +503,23 @@ router.delete('/:folder/:filename', authenticate, async (req, res, next) => {
       });
     }
 
+    // Get file size before deleting
+    const stats = fs.statSync(filePath);
+    const fileSize = stats.size;
+
+    // Delete file
     fs.unlinkSync(filePath);
+
+    // Decrement storage usage
+    await decrementStorageUsage(tenantId, fileSize);
 
     res.json({
       success: true,
       message: 'File deleted successfully',
+      data: {
+        fileSize,
+        freedSpace: fileSize,
+      },
     });
   } catch (error) {
     next(error);

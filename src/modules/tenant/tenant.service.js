@@ -39,13 +39,23 @@ class TenantService {
   }
 
   async updateTenant(tenantId, data) {
+    // Deep-merge settings so partial updates don't wipe existing keys
+    let mergedSettings = undefined;
+    if (data.settings !== undefined) {
+      const current = await prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { settings: true },
+      });
+      mergedSettings = { ...(current?.settings || {}), ...data.settings };
+    }
+
+    const updateData = { updatedAt: new Date() };
+    if (data.name !== undefined) updateData.name = data.name;
+    if (mergedSettings !== undefined) updateData.settings = mergedSettings;
+
     const tenant = await prisma.tenant.update({
       where: { id: tenantId },
-      data: {
-        name: data.name,
-        settings: data.settings,
-        updatedAt: new Date(),
-      },
+      data: updateData,
       select: {
         id: true,
         name: true,
