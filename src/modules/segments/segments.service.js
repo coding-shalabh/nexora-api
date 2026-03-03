@@ -124,15 +124,30 @@ export const segmentsService = {
    * List segments with pagination and filters
    */
   async list({ tenantId, page = 1, limit = 20, type, search, isActive }) {
-    // TODO: Segments feature not yet implemented - Segment model doesn't exist
-    // Return empty data for now with proper structure
+    const where = { tenantId };
+    if (type) where.type = type;
+    if (search) where.name = { contains: search, mode: 'insensitive' };
+    if (isActive !== undefined) where.isActive = isActive;
+
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      prisma.segments.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.segments.count({ where }),
+    ]);
+
     return {
-      data: [],
+      data,
       pagination: {
         page,
         limit,
-        total: 0,
-        totalPages: 0,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
     };
   },
@@ -141,7 +156,7 @@ export const segmentsService = {
    * Get a single segment by ID
    */
   async get({ tenantId, segmentId }) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
@@ -156,7 +171,7 @@ export const segmentsService = {
    * Get contacts in a segment (with evaluation for dynamic segments)
    */
   async getContacts({ tenantId, segmentId, page = 1, limit = 50 }) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
@@ -250,13 +265,8 @@ export const segmentsService = {
    * Create a new segment
    */
   async create({ tenantId, userId, data }) {
-    // Check if Segment model exists in prisma client
-    if (!prisma.segment) {
-      throw new Error('Segments feature is not yet available');
-    }
-
     // Check for duplicate name
-    const existing = await prisma.segment.findFirst({
+    const existing = await prisma.segments.findFirst({
       where: { tenantId, name: data.name },
     });
 
@@ -275,7 +285,7 @@ export const segmentsService = {
       contactCount = data.contactIds.length;
     }
 
-    const segment = await prisma.segment.create({
+    const segment = await prisma.segments.create({
       data: {
         tenantId,
         createdById: userId,
@@ -297,7 +307,7 @@ export const segmentsService = {
    * Update a segment
    */
   async update({ tenantId, segmentId, data }) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
@@ -307,7 +317,7 @@ export const segmentsService = {
 
     // Check for duplicate name if name is being changed
     if (data.name && data.name !== segment.name) {
-      const existing = await prisma.segment.findFirst({
+      const existing = await prisma.segments.findFirst({
         where: { tenantId, name: data.name, id: { not: segmentId } },
       });
       if (existing) {
@@ -339,7 +349,7 @@ export const segmentsService = {
     }
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
-    const updated = await prisma.segment.update({
+    const updated = await prisma.segments.update({
       where: { id: segmentId },
       data: updateData,
     });
@@ -351,7 +361,7 @@ export const segmentsService = {
    * Delete a segment
    */
   async delete({ tenantId, segmentId }) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
@@ -359,7 +369,7 @@ export const segmentsService = {
       throw new Error('Segment not found');
     }
 
-    await prisma.segment.delete({
+    await prisma.segments.delete({
       where: { id: segmentId },
     });
   },
@@ -368,7 +378,7 @@ export const segmentsService = {
    * Sync a dynamic segment (recalculate contact count)
    */
   async sync({ tenantId, segmentId }) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
@@ -385,7 +395,7 @@ export const segmentsService = {
       where: { tenantId, ...filterConditions },
     });
 
-    const updated = await prisma.segment.update({
+    const updated = await prisma.segments.update({
       where: { id: segmentId },
       data: {
         contactCount,
@@ -400,7 +410,7 @@ export const segmentsService = {
    * Duplicate a segment
    */
   async duplicate({ tenantId, segmentId, userId }) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
@@ -411,12 +421,12 @@ export const segmentsService = {
     // Generate unique name
     let newName = `${segment.name} (Copy)`;
     let counter = 1;
-    while (await prisma.segment.findFirst({ where: { tenantId, name: newName } })) {
+    while (await prisma.segments.findFirst({ where: { tenantId, name: newName } })) {
       counter++;
       newName = `${segment.name} (Copy ${counter})`;
     }
 
-    const newSegment = await prisma.segment.create({
+    const newSegment = await prisma.segments.create({
       data: {
         tenantId,
         createdById: userId,
@@ -438,7 +448,7 @@ export const segmentsService = {
    * Add contacts to a static segment
    */
   async addContacts({ tenantId, segmentId, contactIds }) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
@@ -460,7 +470,7 @@ export const segmentsService = {
     const existingIds = segment.contactIds || [];
     const newIds = [...new Set([...existingIds, ...validIds])];
 
-    const updated = await prisma.segment.update({
+    const updated = await prisma.segments.update({
       where: { id: segmentId },
       data: {
         contactIds: newIds,
@@ -475,7 +485,7 @@ export const segmentsService = {
    * Remove contacts from a static segment
    */
   async removeContacts({ tenantId, segmentId, contactIds }) {
-    const segment = await prisma.segment.findFirst({
+    const segment = await prisma.segments.findFirst({
       where: { id: segmentId, tenantId },
     });
 
@@ -490,7 +500,7 @@ export const segmentsService = {
     const existingIds = segment.contactIds || [];
     const newIds = existingIds.filter((id) => !contactIds.includes(id));
 
-    const updated = await prisma.segment.update({
+    const updated = await prisma.segments.update({
       where: { id: segmentId },
       data: {
         contactIds: newIds,

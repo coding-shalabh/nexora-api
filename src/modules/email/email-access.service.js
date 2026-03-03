@@ -3,7 +3,7 @@
  * Enterprise-ready shared inbox management
  */
 
-import { prisma } from '@crm360/database'
+import { prisma } from '@crm360/database';
 
 /**
  * Get all users/teams with access to an email account
@@ -11,23 +11,23 @@ import { prisma } from '@crm360/database'
 export async function getEmailAccountAccess(emailAccountId, tenantId) {
   // First verify the email account belongs to this tenant
   const emailAccount = await prisma.emailAccount.findFirst({
-    where: { id: emailAccountId, tenantId }
-  })
+    where: { id: emailAccountId, tenantId },
+  });
 
   if (!emailAccount) {
-    throw new Error('Email account not found')
+    throw new Error('Email account not found');
   }
 
-  const accessList = await prisma.emailAccountAccess.findMany({
+  const accessList = await prisma.email_account_access.findMany({
     where: { emailAccountId },
-    orderBy: { grantedAt: 'desc' }
-  })
+    orderBy: { grantedAt: 'desc' },
+  });
 
   // Fetch user/team details for each access entry
   const enrichedAccess = await Promise.all(
     accessList.map(async (access) => {
-      let entity = null
-      let entityType = null
+      let entity = null;
+      let entityType = null;
 
       if (access.userId) {
         entity = await prisma.user.findUnique({
@@ -39,20 +39,20 @@ export async function getEmailAccountAccess(emailAccountId, tenantId) {
             lastName: true,
             displayName: true,
             avatarUrl: true,
-            status: true
-          }
-        })
-        entityType = 'user'
+            status: true,
+          },
+        });
+        entityType = 'user';
       } else if (access.teamId) {
         entity = await prisma.team.findUnique({
           where: { id: access.teamId },
           select: {
             id: true,
             name: true,
-            description: true
-          }
-        })
-        entityType = 'team'
+            description: true,
+          },
+        });
+        entityType = 'team';
       }
 
       // Get granter info
@@ -62,9 +62,9 @@ export async function getEmailAccountAccess(emailAccountId, tenantId) {
           id: true,
           firstName: true,
           lastName: true,
-          email: true
-        }
-      })
+          email: true,
+        },
+      });
 
       return {
         id: access.id,
@@ -73,114 +73,128 @@ export async function getEmailAccountAccess(emailAccountId, tenantId) {
         permission: access.permission,
         grantedBy: granter,
         grantedAt: access.grantedAt,
-        expiresAt: access.expiresAt
-      }
+        expiresAt: access.expiresAt,
+      };
     })
-  )
+  );
 
   return {
     emailAccount: {
       id: emailAccount.id,
       email: emailAccount.email,
       displayName: emailAccount.displayName,
-      provider: emailAccount.provider
+      provider: emailAccount.provider,
     },
-    accessList: enrichedAccess.filter(a => a.entity !== null)
-  }
+    accessList: enrichedAccess.filter((a) => a.entity !== null),
+  };
 }
 
 /**
  * Grant access to a user
  */
-export async function grantUserAccess(emailAccountId, userId, permission, grantedBy, tenantId, expiresAt = null) {
+export async function grantUserAccess(
+  emailAccountId,
+  userId,
+  permission,
+  grantedBy,
+  tenantId,
+  expiresAt = null
+) {
   // Verify email account belongs to tenant
   const emailAccount = await prisma.emailAccount.findFirst({
-    where: { id: emailAccountId, tenantId }
-  })
+    where: { id: emailAccountId, tenantId },
+  });
 
   if (!emailAccount) {
-    throw new Error('Email account not found')
+    throw new Error('Email account not found');
   }
 
   // Verify user belongs to same tenant
   const user = await prisma.user.findFirst({
-    where: { id: userId, tenantId }
-  })
+    where: { id: userId, tenantId },
+  });
 
   if (!user) {
-    throw new Error('User not found')
+    throw new Error('User not found');
   }
 
   // Check if access already exists
-  const existingAccess = await prisma.emailAccountAccess.findFirst({
-    where: { emailAccountId, userId }
-  })
+  const existingAccess = await prisma.email_account_access.findFirst({
+    where: { emailAccountId, userId },
+  });
 
   if (existingAccess) {
     // Update existing access
-    return await prisma.emailAccountAccess.update({
+    return await prisma.email_account_access.update({
       where: { id: existingAccess.id },
-      data: { permission, expiresAt }
-    })
+      data: { permission, expiresAt },
+    });
   }
 
   // Create new access
-  return await prisma.emailAccountAccess.create({
+  return await prisma.email_account_access.create({
     data: {
       emailAccountId,
       userId,
       permission,
       grantedBy,
-      expiresAt
-    }
-  })
+      expiresAt,
+    },
+  });
 }
 
 /**
  * Grant access to a team
  */
-export async function grantTeamAccess(emailAccountId, teamId, permission, grantedBy, tenantId, expiresAt = null) {
+export async function grantTeamAccess(
+  emailAccountId,
+  teamId,
+  permission,
+  grantedBy,
+  tenantId,
+  expiresAt = null
+) {
   // Verify email account belongs to tenant
   const emailAccount = await prisma.emailAccount.findFirst({
-    where: { id: emailAccountId, tenantId }
-  })
+    where: { id: emailAccountId, tenantId },
+  });
 
   if (!emailAccount) {
-    throw new Error('Email account not found')
+    throw new Error('Email account not found');
   }
 
   // Verify team belongs to same tenant
   const team = await prisma.team.findFirst({
-    where: { id: teamId, tenantId }
-  })
+    where: { id: teamId, tenantId },
+  });
 
   if (!team) {
-    throw new Error('Team not found')
+    throw new Error('Team not found');
   }
 
   // Check if access already exists
-  const existingAccess = await prisma.emailAccountAccess.findFirst({
-    where: { emailAccountId, teamId }
-  })
+  const existingAccess = await prisma.email_account_access.findFirst({
+    where: { emailAccountId, teamId },
+  });
 
   if (existingAccess) {
     // Update existing access
-    return await prisma.emailAccountAccess.update({
+    return await prisma.email_account_access.update({
       where: { id: existingAccess.id },
-      data: { permission, expiresAt }
-    })
+      data: { permission, expiresAt },
+    });
   }
 
   // Create new access
-  return await prisma.emailAccountAccess.create({
+  return await prisma.email_account_access.create({
     data: {
       emailAccountId,
       teamId,
       permission,
       grantedBy,
-      expiresAt
-    }
-  })
+      expiresAt,
+    },
+  });
 }
 
 /**
@@ -188,55 +202,55 @@ export async function grantTeamAccess(emailAccountId, teamId, permission, grante
  */
 export async function revokeAccess(accessId, tenantId) {
   // Verify access exists and belongs to tenant's email account
-  const access = await prisma.emailAccountAccess.findUnique({
-    where: { id: accessId }
-  })
+  const access = await prisma.email_account_access.findUnique({
+    where: { id: accessId },
+  });
 
   if (!access) {
-    throw new Error('Access not found')
+    throw new Error('Access not found');
   }
 
   // Verify email account belongs to tenant
   const emailAccount = await prisma.emailAccount.findFirst({
-    where: { id: access.emailAccountId, tenantId }
-  })
+    where: { id: access.emailAccountId, tenantId },
+  });
 
   if (!emailAccount) {
-    throw new Error('Access not found')
+    throw new Error('Access not found');
   }
 
-  await prisma.emailAccountAccess.delete({
-    where: { id: accessId }
-  })
+  await prisma.email_account_access.delete({
+    where: { id: accessId },
+  });
 
-  return { success: true }
+  return { success: true };
 }
 
 /**
  * Update access permission
  */
 export async function updateAccessPermission(accessId, permission, tenantId) {
-  const access = await prisma.emailAccountAccess.findUnique({
-    where: { id: accessId }
-  })
+  const access = await prisma.email_account_access.findUnique({
+    where: { id: accessId },
+  });
 
   if (!access) {
-    throw new Error('Access not found')
+    throw new Error('Access not found');
   }
 
   // Verify email account belongs to tenant
   const emailAccount = await prisma.emailAccount.findFirst({
-    where: { id: access.emailAccountId, tenantId }
-  })
+    where: { id: access.emailAccountId, tenantId },
+  });
 
   if (!emailAccount) {
-    throw new Error('Access not found')
+    throw new Error('Access not found');
   }
 
-  return await prisma.emailAccountAccess.update({
+  return await prisma.email_account_access.update({
     where: { id: accessId },
-    data: { permission }
-  })
+    data: { permission },
+  });
 }
 
 /**
@@ -246,57 +260,52 @@ export async function getUserAccessibleEmailAccounts(userId, tenantId) {
   // Get user's team memberships
   const teamMemberships = await prisma.teamMember.findMany({
     where: { userId },
-    select: { teamId: true }
-  })
-  const teamIds = teamMemberships.map(tm => tm.teamId)
+    select: { teamId: true },
+  });
+  const teamIds = teamMemberships.map((tm) => tm.teamId);
 
   // Get direct user access
-  const userAccess = await prisma.emailAccountAccess.findMany({
+  const userAccess = await prisma.email_account_access.findMany({
     where: {
       userId,
-      OR: [
-        { expiresAt: null },
-        { expiresAt: { gt: new Date() } }
-      ]
-    }
-  })
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+  });
 
   // Get team access
-  const teamAccess = teamIds.length > 0
-    ? await prisma.emailAccountAccess.findMany({
-        where: {
-          teamId: { in: teamIds },
-          OR: [
-            { expiresAt: null },
-            { expiresAt: { gt: new Date() } }
-          ]
-        }
-      })
-    : []
+  const teamAccess =
+    teamIds.length > 0
+      ? await prisma.email_account_access.findMany({
+          where: {
+            teamId: { in: teamIds },
+            OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          },
+        })
+      : [];
 
   // Combine and deduplicate
-  const accessMap = new Map()
+  const accessMap = new Map();
 
   // User access takes priority
-  userAccess.forEach(a => {
+  userAccess.forEach((a) => {
     accessMap.set(a.emailAccountId, {
       permission: a.permission,
-      source: 'user'
-    })
-  })
+      source: 'user',
+    });
+  });
 
   // Add team access if not already present
-  teamAccess.forEach(a => {
+  teamAccess.forEach((a) => {
     if (!accessMap.has(a.emailAccountId)) {
       accessMap.set(a.emailAccountId, {
         permission: a.permission,
-        source: 'team'
-      })
+        source: 'team',
+      });
     }
-  })
+  });
 
   // Fetch email account details
-  const accountIds = Array.from(accessMap.keys())
+  const accountIds = Array.from(accessMap.keys());
 
   if (accountIds.length === 0) {
     // Return user's own email accounts
@@ -309,21 +318,21 @@ export async function getUserAccessibleEmailAccounts(userId, tenantId) {
         provider: true,
         status: true,
         isDefault: true,
-        lastSyncAt: true
-      }
-    })
-    return ownAccounts.map(acc => ({
+        lastSyncAt: true,
+      },
+    });
+    return ownAccounts.map((acc) => ({
       ...acc,
       permission: 'FULL_ACCESS',
-      source: 'owner'
-    }))
+      source: 'owner',
+    }));
   }
 
   const emailAccounts = await prisma.emailAccount.findMany({
     where: {
       id: { in: accountIds },
       tenantId,
-      status: 'ACTIVE'
+      status: 'ACTIVE',
     },
     select: {
       id: true,
@@ -332,9 +341,9 @@ export async function getUserAccessibleEmailAccounts(userId, tenantId) {
       provider: true,
       status: true,
       isDefault: true,
-      lastSyncAt: true
-    }
-  })
+      lastSyncAt: true,
+    },
+  });
 
   // Also get user's own accounts
   const ownAccounts = await prisma.emailAccount.findMany({
@@ -346,29 +355,29 @@ export async function getUserAccessibleEmailAccounts(userId, tenantId) {
       provider: true,
       status: true,
       isDefault: true,
-      lastSyncAt: true
-    }
-  })
+      lastSyncAt: true,
+    },
+  });
 
   // Combine and return
-  const result = ownAccounts.map(acc => ({
+  const result = ownAccounts.map((acc) => ({
     ...acc,
     permission: 'FULL_ACCESS',
-    source: 'owner'
-  }))
+    source: 'owner',
+  }));
 
-  emailAccounts.forEach(acc => {
-    if (!result.find(r => r.id === acc.id)) {
-      const access = accessMap.get(acc.id)
+  emailAccounts.forEach((acc) => {
+    if (!result.find((r) => r.id === acc.id)) {
+      const access = accessMap.get(acc.id);
       result.push({
         ...acc,
         permission: access.permission,
-        source: access.source
-      })
+        source: access.source,
+      });
     }
-  })
+  });
 
-  return result
+  return result;
 }
 
 /**
@@ -377,64 +386,58 @@ export async function getUserAccessibleEmailAccounts(userId, tenantId) {
 export async function checkUserAccess(userId, emailAccountId, requiredPermission = 'READ_ONLY') {
   // Check if user owns the account
   const ownAccount = await prisma.emailAccount.findFirst({
-    where: { id: emailAccountId, userId }
-  })
+    where: { id: emailAccountId, userId },
+  });
 
   if (ownAccount) {
-    return { hasAccess: true, permission: 'FULL_ACCESS', source: 'owner' }
+    return { hasAccess: true, permission: 'FULL_ACCESS', source: 'owner' };
   }
 
   // Check direct access
-  const directAccess = await prisma.emailAccountAccess.findFirst({
+  const directAccess = await prisma.email_account_access.findFirst({
     where: {
       emailAccountId,
       userId,
-      OR: [
-        { expiresAt: null },
-        { expiresAt: { gt: new Date() } }
-      ]
-    }
-  })
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+  });
 
   if (directAccess) {
-    const hasPermission = checkPermissionLevel(directAccess.permission, requiredPermission)
+    const hasPermission = checkPermissionLevel(directAccess.permission, requiredPermission);
     return {
       hasAccess: hasPermission,
       permission: directAccess.permission,
-      source: 'user'
-    }
+      source: 'user',
+    };
   }
 
   // Check team access
   const teamMemberships = await prisma.teamMember.findMany({
     where: { userId },
-    select: { teamId: true }
-  })
-  const teamIds = teamMemberships.map(tm => tm.teamId)
+    select: { teamId: true },
+  });
+  const teamIds = teamMemberships.map((tm) => tm.teamId);
 
   if (teamIds.length > 0) {
-    const teamAccess = await prisma.emailAccountAccess.findFirst({
+    const teamAccess = await prisma.email_account_access.findFirst({
       where: {
         emailAccountId,
         teamId: { in: teamIds },
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } }
-        ]
-      }
-    })
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+    });
 
     if (teamAccess) {
-      const hasPermission = checkPermissionLevel(teamAccess.permission, requiredPermission)
+      const hasPermission = checkPermissionLevel(teamAccess.permission, requiredPermission);
       return {
         hasAccess: hasPermission,
         permission: teamAccess.permission,
-        source: 'team'
-      }
+        source: 'team',
+      };
     }
   }
 
-  return { hasAccess: false, permission: null, source: null }
+  return { hasAccess: false, permission: null, source: null };
 }
 
 /**
@@ -442,12 +445,12 @@ export async function checkUserAccess(userId, emailAccountId, requiredPermission
  */
 function checkPermissionLevel(userPermission, requiredPermission) {
   const levels = {
-    'READ_ONLY': 1,
-    'READ_REPLY': 2,
-    'FULL_ACCESS': 3
-  }
+    READ_ONLY: 1,
+    READ_REPLY: 2,
+    FULL_ACCESS: 3,
+  };
 
-  return levels[userPermission] >= levels[requiredPermission]
+  return levels[userPermission] >= levels[requiredPermission];
 }
 
 export default {
@@ -457,5 +460,5 @@ export default {
   revokeAccess,
   updateAccessPermission,
   getUserAccessibleEmailAccounts,
-  checkUserAccess
-}
+  checkUserAccess,
+};

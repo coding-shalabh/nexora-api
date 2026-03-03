@@ -11,6 +11,11 @@ import { prisma } from '@crm360/database';
  * Get all aliases for a tenant
  */
 export async function getAliases(tenantId, options = {}) {
+  // Guard: model not yet in Prisma schema
+  if (!prisma.emailAlias) {
+    return { aliases: [], total: 0, page: 1, limit: 50, totalPages: 0 };
+  }
+
   const { mailboxId, domainId, page = 1, limit = 50 } = options;
 
   const where = { tenantId };
@@ -191,6 +196,11 @@ export async function deleteAlias(tenantId, aliasId) {
  * Get all forwarders for a tenant
  */
 export async function getForwarders(tenantId, options = {}) {
+  // Guard: model not yet in Prisma schema
+  if (!prisma.emailForwarder) {
+    return { forwarders: [], total: 0, page: 1, limit: 50, totalPages: 0 };
+  }
+
   const { domainId, page = 1, limit = 50 } = options;
 
   const where = { tenantId };

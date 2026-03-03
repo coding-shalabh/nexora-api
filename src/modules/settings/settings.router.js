@@ -14,6 +14,34 @@ const router = Router();
 // All settings routes require authentication
 router.use(authenticate);
 
+/**
+ * GET /settings
+ * Returns available settings sections
+ */
+router.get('/', async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      sections: [
+        'profile',
+        'preferences',
+        'notifications',
+        'organization',
+        'teams',
+        'roles',
+        'security',
+        'integrations',
+        'api-keys',
+        'webhooks',
+        'email',
+        'signatures',
+        'compliance',
+        'subscription',
+      ],
+    },
+  });
+});
+
 // =====================
 // User Profile
 // =====================

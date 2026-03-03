@@ -165,7 +165,7 @@ class IntegrationsService {
   // =====================
 
   async getWebhooks(tenantId) {
-    const webhooks = await prisma.webhook.findMany({
+    const webhooks = await prisma.webhooks.findMany({
       where: { tenantId },
       select: {
         id: true,
@@ -193,7 +193,7 @@ class IntegrationsService {
   }
 
   async getWebhook(tenantId, webhookId) {
-    const webhook = await prisma.webhook.findUnique({
+    const webhook = await prisma.webhooks.findUnique({
       where: { id: webhookId, tenantId },
       select: {
         id: true,
@@ -221,7 +221,7 @@ class IntegrationsService {
     // Generate webhook secret
     const secret = crypto.randomBytes(32).toString('hex');
 
-    const webhook = await prisma.webhook.create({
+    const webhook = await prisma.webhooks.create({
       data: {
         tenantId,
         createdById: userId,
@@ -251,7 +251,7 @@ class IntegrationsService {
   }
 
   async updateWebhook(tenantId, webhookId, data) {
-    const webhook = await prisma.webhook.update({
+    const webhook = await prisma.webhooks.update({
       where: { id: webhookId, tenantId },
       data: {
         name: data.name,
@@ -275,7 +275,7 @@ class IntegrationsService {
   }
 
   async deleteWebhook(tenantId, webhookId) {
-    await prisma.webhook.delete({
+    await prisma.webhooks.delete({
       where: { id: webhookId, tenantId },
     });
 
@@ -283,7 +283,7 @@ class IntegrationsService {
   }
 
   async testWebhook(tenantId, webhookId, eventType) {
-    const webhook = await prisma.webhook.findUnique({
+    const webhook = await prisma.webhooks.findUnique({
       where: { id: webhookId, tenantId },
       select: { url: true, secret: true, headers: true },
     });
@@ -324,7 +324,7 @@ class IntegrationsService {
       const statusCode = response.status;
 
       // Log the delivery
-      await prisma.webhookDelivery.create({
+      await prisma.webhooksDelivery.create({
         data: {
           webhookId,
           event: eventType || 'test.event',
@@ -343,7 +343,7 @@ class IntegrationsService {
       };
     } catch (error) {
       // Log failed delivery
-      await prisma.webhookDelivery.create({
+      await prisma.webhooksDelivery.create({
         data: {
           webhookId,
           event: eventType || 'test.event',
@@ -366,7 +366,7 @@ class IntegrationsService {
   async getWebhookDeliveries(tenantId, webhookId, options = {}) {
     const { limit = 50, offset = 0 } = options;
 
-    const webhook = await prisma.webhook.findUnique({
+    const webhook = await prisma.webhooks.findUnique({
       where: { id: webhookId, tenantId },
       select: { id: true },
     });
@@ -376,7 +376,7 @@ class IntegrationsService {
     }
 
     const [deliveries, total] = await Promise.all([
-      prisma.webhookDelivery.findMany({
+      prisma.webhooksDelivery.findMany({
         where: { webhookId },
         select: {
           id: true,
@@ -391,7 +391,7 @@ class IntegrationsService {
         take: limit,
         skip: offset,
       }),
-      prisma.webhookDelivery.count({ where: { webhookId } }),
+      prisma.webhooksDelivery.count({ where: { webhookId } }),
     ]);
 
     return {
@@ -402,7 +402,7 @@ class IntegrationsService {
   }
 
   async retryWebhookDelivery(tenantId, webhookId, deliveryId) {
-    const delivery = await prisma.webhookDelivery.findUnique({
+    const delivery = await prisma.webhooksDelivery.findUnique({
       where: { id: deliveryId },
       include: {
         webhook: {

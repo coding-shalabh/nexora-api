@@ -9,6 +9,11 @@ import { prisma } from '@crm360/database';
  * Get all drafts for a mailbox
  */
 export async function getDrafts(tenantId, mailboxId, options = {}) {
+  // Guard: model not yet in Prisma schema
+  if (!prisma.emailDraft) {
+    return { drafts: [], total: 0, page: 1, limit: 50, totalPages: 0 };
+  }
+
   const { status, page = 1, limit = 50 } = options;
 
   const where = { tenantId, mailboxId };
@@ -278,6 +283,11 @@ export async function sendDraft(tenantId, draftId) {
  * Get email templates
  */
 export async function getTemplates(tenantId, options = {}) {
+  // Guard: model not yet in Prisma schema
+  if (!prisma.emailTemplate) {
+    return { templates: [], total: 0, page: 1, limit: 50, totalPages: 0 };
+  }
+
   const { category, page = 1, limit = 50 } = options;
 
   const where = { tenantId };
@@ -366,6 +376,11 @@ export async function deleteTemplate(tenantId, templateId) {
  * Get email signatures
  */
 export async function getSignatures(tenantId, userId) {
+  // Guard: model not yet in Prisma schema
+  if (!prisma.emailSignature) {
+    return [];
+  }
+
   const signatures = await prisma.emailSignature.findMany({
     where: {
       tenantId,

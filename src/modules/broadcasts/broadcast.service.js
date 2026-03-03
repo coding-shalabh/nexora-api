@@ -19,15 +19,34 @@ class BroadcastService {
    * List broadcasts for a tenant
    */
   async list({ tenantId, page = 1, limit = 20, status, channel }) {
-    // TODO: Broadcasts feature not yet implemented - Broadcast model doesn't exist
-    // Return empty data for now with proper structure
+    const where = { tenantId };
+    if (status) where.status = status;
+    if (channel) where.channel = channel;
+
+    const skip = (page - 1) * limit;
+
+    const [broadcasts, total] = await Promise.all([
+      prisma.broadcasts.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          _count: {
+            select: { broadcast_recipients: true },
+          },
+        },
+      }),
+      prisma.broadcasts.count({ where }),
+    ]);
+
     return {
-      broadcasts: [],
+      broadcasts,
       pagination: {
         page,
         limit,
-        total: 0,
-        pages: 0,
+        total,
+        pages: Math.ceil(total / limit),
       },
     };
   }
@@ -36,11 +55,11 @@ class BroadcastService {
    * Get a single broadcast
    */
   async get({ tenantId, broadcastId }) {
-    const broadcast = await prisma.broadcast.findFirst({
+    const broadcast = await prisma.broadcasts.findFirst({
       where: { id: broadcastId, tenantId },
       include: {
         _count: {
-          select: { recipients: true },
+          select: { broadcast_recipients: true },
         },
       },
     });
@@ -59,7 +78,7 @@ class BroadcastService {
     const broadcast = await this.get({ tenantId, broadcastId });
 
     const [recipients, total] = await Promise.all([
-      prisma.broadcastRecipient.findMany({
+      prisma.broadcast_recipients.findMany({
         where: { broadcastId },
         skip: (page - 1) * limit,
         take: limit,
@@ -70,7 +89,7 @@ class BroadcastService {
           },
         },
       }),
-      prisma.broadcastRecipient.count({ where: { broadcastId } }),
+      prisma.broadcast_recipients.count({ where: { broadcastId } }),
     ]);
 
     return {
@@ -126,7 +145,7 @@ class BroadcastService {
       });
     } else if (audienceType === 'SEGMENT' && segmentId) {
       // Get contacts from segment
-      const segment = await prisma.segment.findFirst({
+      const segment = await prisma.segments.findFirst({
         where: { id: segmentId, tenantId },
       });
       if (segment) {
@@ -141,7 +160,7 @@ class BroadcastService {
     }
 
     // Create the broadcast
-    const broadcast = await prisma.broadcast.create({
+    const broadcast = await prisma.broadcasts.create({
       data: {
         tenantId,
         name,
@@ -180,7 +199,7 @@ class BroadcastService {
       throw new Error('Cannot update a broadcast that has already been sent');
     }
 
-    const updated = await prisma.broadcast.update({
+    const updated = await prisma.broadcasts.update({
       where: { id: broadcastId },
       data: {
         ...data,
@@ -203,11 +222,11 @@ class BroadcastService {
     }
 
     // Delete recipients first
-    await prisma.broadcastRecipient.deleteMany({
+    await prisma.broadcast_recipients.deleteMany({
       where: { broadcastId },
     });
 
-    await prisma.broadcast.delete({
+    await prisma.broadcasts.delete({
       where: { id: broadcastId },
     });
 
@@ -225,7 +244,7 @@ class BroadcastService {
     }
 
     // Update status to SENDING
-    await prisma.broadcast.update({
+    await prisma.broadcasts.update({
       where: { id: broadcastId },
       data: { status: 'SENDING', startedAt: new Date() },
     });
@@ -250,7 +269,7 @@ class BroadcastService {
       status: 'PENDING',
     }));
 
-    await prisma.broadcastRecipient.createMany({
+    await prisma.broadcast_recipients.createMany({
       data: recipientRecords,
     });
 
@@ -266,7 +285,7 @@ class BroadcastService {
     // Update final status
     const stats = await this.calculateBroadcastStats(broadcastId);
 
-    await prisma.broadcast.update({
+    await prisma.broadcasts.update({
       where: { id: broadcastId },
       data: {
         status: stats.failedCount === stats.totalRecipients ? 'FAILED' : 'COMPLETED',
@@ -351,7 +370,7 @@ class BroadcastService {
 
       if (response.ok) {
         // Mark all recipients as sent
-        await prisma.broadcastRecipient.updateMany({
+        await prisma.broadcast_recipients.updateMany({
           where: { broadcastId: broadcast.id },
           data: { status: 'SENT', sentAt: new Date() },
         });
@@ -359,7 +378,7 @@ class BroadcastService {
         this.logger.info({ broadcastId: broadcast.id, response: data }, 'WhatsApp broadcast sent');
       } else {
         // Mark all as failed
-        await prisma.broadcastRecipient.updateMany({
+        await prisma.broadcast_recipients.updateMany({
           where: { broadcastId: broadcast.id },
           data: { status: 'FAILED', errorMessage: data.message || 'Failed to send' },
         });
@@ -371,7 +390,7 @@ class BroadcastService {
     } catch (error) {
       this.logger.error({ error }, 'WhatsApp broadcast error');
 
-      await prisma.broadcastRecipient.updateMany({
+      await prisma.broadcast_recipients.updateMany({
         where: { broadcastId: broadcast.id },
         data: { status: 'FAILED', errorMessage: error.message },
       });
@@ -400,7 +419,7 @@ class BroadcastService {
 
     if (!channelAccount) {
       this.logger.error({ broadcastId: broadcast.id }, 'No active SMS channel found');
-      await prisma.broadcastRecipient.updateMany({
+      await prisma.broadcast_recipients.updateMany({
         where: { broadcastId: broadcast.id },
         data: { status: 'FAILED', errorMessage: 'No active SMS channel configured' },
       });
@@ -445,7 +464,7 @@ class BroadcastService {
 
             if (result.success) {
               successCount++;
-              await prisma.broadcastRecipient.updateMany({
+              await prisma.broadcast_recipients.updateMany({
                 where: {
                   broadcastId: broadcast.id,
                   contactId: contact.id,
@@ -458,7 +477,7 @@ class BroadcastService {
               });
             } else {
               failedCount++;
-              await prisma.broadcastRecipient.updateMany({
+              await prisma.broadcast_recipients.updateMany({
                 where: {
                   broadcastId: broadcast.id,
                   contactId: contact.id,
@@ -475,7 +494,7 @@ class BroadcastService {
               { error: error.message, contactId: contact.id },
               'SMS send failed for contact'
             );
-            await prisma.broadcastRecipient.updateMany({
+            await prisma.broadcast_recipients.updateMany({
               where: {
                 broadcastId: broadcast.id,
                 contactId: contact.id,
@@ -499,7 +518,7 @@ class BroadcastService {
 
           if (result.success) {
             successCount += validContacts.length;
-            await prisma.broadcastRecipient.updateMany({
+            await prisma.broadcast_recipients.updateMany({
               where: {
                 broadcastId: broadcast.id,
                 contactId: { in: validContacts.map((c) => c.id) },
@@ -512,7 +531,7 @@ class BroadcastService {
             });
           } else {
             failedCount += validContacts.length;
-            await prisma.broadcastRecipient.updateMany({
+            await prisma.broadcast_recipients.updateMany({
               where: {
                 broadcastId: broadcast.id,
                 contactId: { in: validContacts.map((c) => c.id) },
@@ -526,7 +545,7 @@ class BroadcastService {
         } catch (error) {
           failedCount += validContacts.length;
           this.logger.error({ error: error.message }, 'Bulk SMS send failed');
-          await prisma.broadcastRecipient.updateMany({
+          await prisma.broadcast_recipients.updateMany({
             where: {
               broadcastId: broadcast.id,
               contactId: { in: validContacts.map((c) => c.id) },
@@ -572,7 +591,7 @@ class BroadcastService {
     // TODO: Implement email sending via nodemailer or email service
     this.logger.info({ broadcastId: broadcast.id }, 'Email broadcast - not implemented yet');
 
-    await prisma.broadcastRecipient.updateMany({
+    await prisma.broadcast_recipients.updateMany({
       where: { broadcastId: broadcast.id },
       data: { status: 'FAILED', errorMessage: 'Email broadcast not implemented yet' },
     });
@@ -597,7 +616,7 @@ class BroadcastService {
         },
       });
     } else if (audienceType === 'SEGMENT' && segmentId) {
-      const segment = await prisma.segment.findFirst({
+      const segment = await prisma.segments.findFirst({
         where: { id: segmentId, tenantId },
       });
       if (segment) {
@@ -715,7 +734,7 @@ class BroadcastService {
    * Calculate broadcast statistics
    */
   async calculateBroadcastStats(broadcastId) {
-    const stats = await prisma.broadcastRecipient.groupBy({
+    const stats = await prisma.broadcast_recipients.groupBy({
       by: ['status'],
       where: { broadcastId },
       _count: true,
@@ -793,7 +812,7 @@ class BroadcastService {
   async duplicate({ tenantId, broadcastId, userId }) {
     const original = await this.get({ tenantId, broadcastId });
 
-    const duplicate = await prisma.broadcast.create({
+    const duplicate = await prisma.broadcasts.create({
       data: {
         tenantId,
         name: `${original.name} (Copy)`,
@@ -829,7 +848,7 @@ class BroadcastService {
       throw new Error('Only scheduled broadcasts can be cancelled');
     }
 
-    await prisma.broadcast.update({
+    await prisma.broadcasts.update({
       where: { id: broadcastId },
       data: { status: 'CANCELLED' },
     });

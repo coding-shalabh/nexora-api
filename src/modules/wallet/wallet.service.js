@@ -31,7 +31,7 @@ class WalletService {
   }
 
   async getWallet(tenantId) {
-    const wallet = await prisma.wallet.findUnique({
+    const wallet = await prisma.wallets.findUnique({
       where: { tenantId },
     });
 
@@ -78,7 +78,7 @@ class WalletService {
     `;
 
     // Get recent transactions
-    const recentTransactions = await prisma.walletTransaction.findMany({
+    const recentTransactions = await prisma.walletsTransaction.findMany({
       where: { tenantId },
       take: 10,
       orderBy: { createdAt: 'desc' },
@@ -91,7 +91,7 @@ class WalletService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const todaySpending = await prisma.walletTransaction.groupBy({
+    const todaySpending = await prisma.walletsTransaction.groupBy({
       by: ['channel'],
       where: {
         tenantId,
@@ -126,13 +126,13 @@ class WalletService {
     if (filters.type) where.type = filters.type;
 
     const [transactions, total] = await Promise.all([
-      prisma.walletTransaction.findMany({
+      prisma.walletsTransaction.findMany({
         where,
         skip: (filters.page - 1) * filters.limit,
         take: filters.limit,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.walletTransaction.count({ where }),
+      prisma.walletsTransaction.count({ where }),
     ]);
 
     return {
@@ -147,7 +147,7 @@ class WalletService {
   }
 
   async topUp(tenantId, userId, data) {
-    const wallet = await prisma.wallet.findUnique({
+    const wallet = await prisma.wallets.findUnique({
       where: { tenantId },
     });
 
@@ -157,7 +157,7 @@ class WalletService {
 
     // Create transaction and update balance atomically
     const [transaction] = await prisma.$transaction([
-      prisma.walletTransaction.create({
+      prisma.walletsTransaction.create({
         data: {
           tenantId,
           type: 'CREDIT',
@@ -169,7 +169,7 @@ class WalletService {
           metadata: { paymentMethod: data.paymentMethod },
         },
       }),
-      prisma.wallet.update({
+      prisma.wallets.update({
         where: { tenantId },
         data: { balance: { increment: data.amount } },
       }),
@@ -191,7 +191,7 @@ class WalletService {
   }
 
   async debit(tenantId, amount, channel, description, metadata) {
-    const wallet = await prisma.wallet.findUnique({
+    const wallet = await prisma.wallets.findUnique({
       where: { tenantId },
     });
 
@@ -212,7 +212,7 @@ class WalletService {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const dailySpent = await prisma.walletTransaction.aggregate({
+      const dailySpent = await prisma.walletsTransaction.aggregate({
         where: {
           tenantId,
           type: 'DEBIT',
@@ -228,7 +228,7 @@ class WalletService {
     }
 
     const [transaction] = await prisma.$transaction([
-      prisma.walletTransaction.create({
+      prisma.walletsTransaction.create({
         data: {
           tenantId,
           type: 'DEBIT',
@@ -241,14 +241,14 @@ class WalletService {
           metadata: metadata || {},
         },
       }),
-      prisma.wallet.update({
+      prisma.wallets.update({
         where: { tenantId },
         data: { balance: { decrement: amount } },
       }),
     ]);
 
     // Check for low balance warning
-    const updatedWallet = await prisma.wallet.findUnique({
+    const updatedWallet = await prisma.wallets.findUnique({
       where: { tenantId },
     });
 
@@ -305,7 +305,7 @@ class WalletService {
   }
 
   async updateSettings(tenantId, data) {
-    const wallet = await prisma.wallet.update({
+    const wallet = await prisma.wallets.update({
       where: { tenantId },
       data: {
         lowBalanceThreshold: data.lowBalanceThreshold,
@@ -337,7 +337,7 @@ class WalletService {
    * Check if tenant has sufficient balance for an action
    */
   async checkBalance(tenantId, channel, actionType, quantity = 1) {
-    const wallet = await prisma.wallet.findUnique({
+    const wallet = await prisma.wallets.findUnique({
       where: { tenantId },
     });
 
@@ -393,7 +393,7 @@ class WalletService {
    * Get cost breakdown by channel for a period
    */
   async getCostBreakdown(tenantId, startDate, endDate) {
-    const transactions = await prisma.walletTransaction.findMany({
+    const transactions = await prisma.walletsTransaction.findMany({
       where: {
         tenantId,
         type: 'DEBIT',
@@ -446,7 +446,7 @@ class WalletService {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const historicalUsage = await prisma.walletTransaction.aggregate({
+    const historicalUsage = await prisma.walletsTransaction.aggregate({
       where: {
         tenantId,
         type: 'DEBIT',
@@ -457,7 +457,7 @@ class WalletService {
     });
 
     const dailyAverage = Math.abs(historicalUsage._sum.amount || 0) / 30;
-    const wallet = await prisma.wallet.findUnique({
+    const wallet = await prisma.wallets.findUnique({
       where: { tenantId },
     });
 
@@ -506,7 +506,7 @@ class WalletService {
     const totalCredits = pkg.credits + pkg.bonus;
 
     const [transaction] = await prisma.$transaction([
-      prisma.walletTransaction.create({
+      prisma.walletsTransaction.create({
         data: {
           tenantId,
           type: 'CREDIT',
@@ -522,7 +522,7 @@ class WalletService {
           },
         },
       }),
-      prisma.wallet.update({
+      prisma.wallets.update({
         where: { tenantId },
         data: { balance: { increment: totalCredits } },
       }),

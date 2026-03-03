@@ -11,6 +11,11 @@ import crypto from 'crypto';
  * Get all mailboxes for a tenant
  */
 export async function getMailboxes(tenantId, options = {}) {
+  // Guard: model not yet in Prisma schema
+  if (!prisma.emailMailbox) {
+    return { mailboxes: [], total: 0, page: 1, limit: 50, totalPages: 0 };
+  }
+
   const { domainId, status, page = 1, limit = 50 } = options;
 
   const where = { tenantId };

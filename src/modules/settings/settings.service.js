@@ -1084,7 +1084,7 @@ class SettingsService {
 
   async getWebhooks(tenantId) {
     try {
-      const webhooks = await prisma.webhook.findMany({
+      const webhooks = await prisma.webhooks.findMany({
         where: { tenantId },
         select: {
           id: true,
@@ -1119,7 +1119,7 @@ class SettingsService {
   async createWebhook(tenantId, userId, data) {
     const secret = crypto.randomBytes(32).toString('hex');
 
-    const webhook = await prisma.webhook.create({
+    const webhook = await prisma.webhooks.create({
       data: {
         tenantId,
         createdById: userId,
@@ -1146,7 +1146,7 @@ class SettingsService {
   }
 
   async updateWebhook(tenantId, webhookId, data) {
-    const webhook = await prisma.webhook.update({
+    const webhook = await prisma.webhooks.update({
       where: { id: webhookId, tenantId },
       data: {
         name: data.name,
@@ -1168,7 +1168,7 @@ class SettingsService {
   }
 
   async deleteWebhook(tenantId, webhookId) {
-    await prisma.webhook.delete({
+    await prisma.webhooks.delete({
       where: { id: webhookId, tenantId },
     });
 
@@ -1176,7 +1176,7 @@ class SettingsService {
   }
 
   async testWebhook(tenantId, webhookId, event) {
-    const webhook = await prisma.webhook.findUnique({
+    const webhook = await prisma.webhooks.findUnique({
       where: { id: webhookId, tenantId },
     });
 
@@ -1226,7 +1226,7 @@ class SettingsService {
   }
 
   async getWebhookDeliveryLogs(tenantId, webhookId, options = {}) {
-    const webhook = await prisma.webhook.findUnique({
+    const webhook = await prisma.webhooks.findUnique({
       where: { id: webhookId, tenantId },
     });
 
@@ -1234,7 +1234,7 @@ class SettingsService {
       throw new NotFoundError('Webhook not found');
     }
 
-    const logs = await prisma.webhookDelivery.findMany({
+    const logs = await prisma.webhooksDelivery.findMany({
       where: { webhookId },
       take: options.limit || 50,
       orderBy: { createdAt: 'desc' },
@@ -1867,7 +1867,7 @@ class SettingsService {
   }
 
   async getConsents(tenantId, contactId) {
-    const consents = await prisma.consent.findMany({
+    const consents = await prisma.consents.findMany({
       where: { tenantId, contactId },
       orderBy: { createdAt: 'desc' },
     });
@@ -1876,7 +1876,7 @@ class SettingsService {
   }
 
   async updateConsent(tenantId, contactId, data) {
-    const consent = await prisma.consent.upsert({
+    const consent = await prisma.consents.upsert({
       where: {
         tenantId_contactId_channel_type: {
           tenantId,
